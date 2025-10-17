@@ -1,0 +1,287 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+
+import java.util.concurrent.TimeUnit;
+
+
+@TeleOp(name = "teleOp", group = "Linear OpMode")
+public class teleOp extends LinearOpMode {
+
+    // Declare OpMode variables.
+    // elapsed Time
+    private final ElapsedTime runtime = new ElapsedTime();
+
+    // these variables are for headless mode, I don't really understand it, I stole them from 3189
+    double driveTurn;
+    double driveVertical;
+    double driveHorizontal;
+    double gamepadX;
+    double gamepadY;
+    double gamepadHypot;
+    double gamepadDegree;
+    double robotDegree;
+    double movementDegree;
+    double gamepadXControl;
+    double gamepadYControl;
+
+    // whether or not headless mode is on
+    boolean headlessMode = false;
+
+    // release servo variables
+    static double hold = 0;
+    static double drop = .2;
+
+    // shooter toggle variables
+    boolean shooterOneToggle = false;
+
+    // class variables. Just config right now
+    Configuration config;
+
+    // method syncing shooter motors
+    public void shooterPower(double motorPower) {
+        config.shooterLeft.setPower(motorPower);
+        config.shooterRight.setPower(motorPower);
+    }
+
+    // START RUNNING !!! \/
+
+    @Override
+    public void runOpMode() {
+        telemetry.addData("Status", "Initialized");
+        telemetry.update();
+
+        // initialize the config variable with the proper argument. !!!!! IMPORTANT
+        config = new Configuration(hardwareMap);
+
+        // define all the button objects that will use the button class
+        // gamepad 1
+        Button gamepad1A = new Button(gamepad1.a);
+        Button gamepad1B = new Button(gamepad1.b);
+        Button gamepad1X = new Button(gamepad1.x);
+        Button gamepad1Y = new Button(gamepad1.y);
+        Button gamepad1Dpad_Up = new Button(gamepad1.dpad_up);
+        Button gamepad1Dpad_Down = new Button(gamepad1.dpad_down);
+        Button gamepad1Dpad_Left = new Button(gamepad1.dpad_left);
+        Button gamepad1Dpad_Right = new Button(gamepad1.dpad_right);
+        Button gamepad1_right_stick_button = new Button(gamepad1.right_stick_button);
+        Button gamepad1_left_stick_button = new Button(gamepad1.left_stick_button);
+        Button gamepad1_Right_bumper = new Button(gamepad1.right_bumper);
+        Button gamepad1_Left_bumper = new Button(gamepad1.left_bumper);
+        // gamepad 2
+        Button gamepad2A = new Button(gamepad2.a);
+        Button gamepad2B = new Button(gamepad2.b);
+        Button gamepad2X = new Button(gamepad2.x);
+        Button gamepad2Y = new Button(gamepad2.y);
+        Button gamepad2Dpad_Up = new Button(gamepad2.dpad_up);
+        Button gamepad2Dpad_Down = new Button(gamepad2.dpad_down);
+        Button gamepad2Dpad_Left = new Button(gamepad2.dpad_left);
+        Button gamepad2Dpad_Right = new Button(gamepad2.dpad_right);
+        Button gamepad2_right_stick_button = new Button(gamepad2.right_stick_button);
+        Button gamepad2_left_stick_button = new Button(gamepad2.left_stick_button);
+        Button gamepad2_Right_bumper = new Button(gamepad2.right_bumper);
+        Button gamepad2_Left_bumper = new Button(gamepad2.left_bumper);
+
+        // initialize the gyro (we don't actually use it anywhere)
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
+        parameters.calibrationDataFile = "BNO055IMUCalibration.json";
+        BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
+        imu.initialize(parameters);
+
+        // INIT POSITION
+        // shooter off and servo set to 0
+
+        // tell when init is done
+        telemetry.addLine("init done");
+        telemetry.update();
+
+        waitForStart();
+        // restart the timer
+        runtime.reset();
+        long savedTime = 0;
+
+        // run until the end of the match (driver presses STOP)
+        while (opModeIsActive()) {
+
+            //update all of the buttons
+            // gamepad 1
+            gamepad1A.update(gamepad1.a);
+            gamepad1B.update(gamepad1.b);
+            gamepad1X.update(gamepad1.x);
+            gamepad1Y.update(gamepad1.y);
+            gamepad1Dpad_Up.update(gamepad1.dpad_up);
+            gamepad1Dpad_Down.update(gamepad1.dpad_down);
+            gamepad1Dpad_Left.update(gamepad1.dpad_left);
+            gamepad1Dpad_Right.update(gamepad1.dpad_right);
+            gamepad1_right_stick_button.update(gamepad1.right_stick_button);
+            gamepad1_left_stick_button.update(gamepad1.left_stick_button);
+            gamepad1_Right_bumper.update(gamepad1.right_bumper);
+            gamepad1_Left_bumper.update(gamepad1.left_bumper);
+            // gamepad 2
+            gamepad2A.update(gamepad2.a);
+            gamepad2B.update(gamepad2.b);
+            gamepad2X.update(gamepad2.x);
+            gamepad2Y.update(gamepad2.y);
+            gamepad2Dpad_Up.update(gamepad2.dpad_up);
+            gamepad2Dpad_Down.update(gamepad2.dpad_down);
+            gamepad2Dpad_Left.update(gamepad2.dpad_left);
+            gamepad2Dpad_Right.update(gamepad2.dpad_right);
+            gamepad2_right_stick_button.update(gamepad2.right_stick_button);
+            gamepad2_left_stick_button.update(gamepad2.left_stick_button);
+            gamepad2_Right_bumper.update(gamepad2.right_bumper);
+            gamepad2_Left_bumper.update(gamepad2.left_bumper);
+
+            // MANUAL CONTROL !!! \/
+            // toggle release (make a method that takes a servo as an argument and use it for all releases)
+            if (gamepad1A.buttonPress()) {
+                config.releaseLeft.setPosition(drop);
+                config.releaseMiddle.setPosition(drop);
+                config.releaseRight.setPosition(drop);
+                sleep(750);
+                config.releaseLeft.setPosition(hold);
+                config.releaseMiddle.setPosition(hold);
+                config.releaseRight.setPosition(hold);
+            }
+
+            // drop left
+            if (gamepad1X.buttonPress()) {
+                config.releaseLeft.setPosition(drop);
+                sleep(750);
+                config.releaseLeft.setPosition(hold);
+            }
+
+            // drop middle
+            if (gamepad1Y.buttonPress()) {
+                config.releaseMiddle.setPosition(drop);
+                sleep(750);
+                config.releaseMiddle.setPosition(hold);
+            }
+
+            // drop right
+            if (gamepad1B.buttonPress()) {
+                config.releaseRight.setPosition(drop);
+                sleep(750);
+                config.releaseRight.setPosition(hold);
+            }
+
+            // toggle shooter on/off (don't forget to add both motors)
+            if (gamepad1_Right_bumper.buttonPress()) {
+                shooterOneToggle = !shooterOneToggle;
+            }
+            if (shooterOneToggle) {
+                shooterPower(.85);
+            } else {
+                shooterPower(0);
+            }
+
+            // toggle intake...
+
+            // telemetry
+            telemetry.addData("releaseLeft pose", config.releaseLeft.getPosition());
+            telemetry.addData("releaseMiddle pose", config.releaseMiddle.getPosition());
+            telemetry.addData("releaseRight pose", config.releaseRight.getPosition());
+            telemetry.addData("shooter power", config.shooterLeft.getPower());
+
+            // DRIVE !!! \/
+
+            // headless mode toggle
+            if (gamepad1Y.buttonPress()) {
+                headlessMode = !headlessMode;
+            }
+            telemetry.addData("Headless Mode", headlessMode);
+
+            // SPEED
+            double turnMultiplier = .85;
+
+            telemetry.addData("turn multiplier (drive speed): ", turnMultiplier);
+
+            //drive code, I don't really understand much.
+            if (headlessMode) {
+                driveTurn = -gamepad1.left_stick_x;
+                driveHorizontal = gamepad1.right_stick_x;
+                driveVertical = -gamepad1.right_stick_y;
+
+                gamepadX = gamepad1.right_stick_x; //this simply gives our x value relative to the driver
+                gamepadY = -gamepad1.right_stick_y; //this simply gives our y value relative to the driver
+                gamepadHypot = Range.clip(Math.hypot(gamepadX, gamepadY), 0, 1);
+                // finds just how much power to give the robot based on how much x and y given by gamepad
+                // range.clip helps us keep our power within positive 1
+                // also helps set maximum possible value of 1/sqrt(2) for x and y controls if at a 45 degree angle (which yields greatest possible value for y+x)
+
+                // prevent /0 error
+                if (gamepadX != 0) {
+                    //calculates gamepad degree with inverse tangent
+                    gamepadDegree = Math.toDegrees(Math.atan(gamepadY / gamepadX));
+                    //if stick is left, make angle left
+                    if (gamepadX < 0) {
+                        gamepadDegree += 180;
+                    }
+                }
+                //straight up
+                else if (gamepadY > 0) {
+                    gamepadDegree = 90;
+                }
+                // straight down
+                else if (gamepadY < 0) {
+                    gamepadDegree = 270;
+                }
+                // gamepad has not been moved
+                else {
+                    gamepadDegree = 0;
+                }
+
+                // RESET GYRO IF NEEDED !!!
+                if (gamepad1.x) {
+                    imu.initialize(parameters);
+                }
+
+                telemetry.addData("runtime - saved time", runtime.now(TimeUnit.MILLISECONDS) - savedTime);
+
+                //ANGLE MATH
+                //gives us the angle our robot is at
+                robotDegree = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle + 180;
+                telemetry.addData("Robot degree", robotDegree);
+                //find angle relative to robot position
+                movementDegree = gamepadDegree - robotDegree;
+                //by finding the adjacent side, we can find sideways movement relative to robot
+                gamepadXControl = Math.cos(Math.toRadians(movementDegree)) * gamepadHypot;
+                driveHorizontal = Math.cos(Math.toRadians(movementDegree)) * gamepadHypot;
+                //by finding the opposite side, we can find vertical movement relative to robot
+                gamepadYControl = Math.sin(Math.toRadians(movementDegree)) * gamepadHypot;
+                driveVertical = Math.sin(Math.toRadians(movementDegree)) * gamepadHypot;
+
+
+                //drive math
+                double strafeSpeed = 1.5;
+                driveTurn *= .85; // yaw speed
+                config.frontRight.setPower((driveVertical - (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
+                config.backRight.setPower((driveVertical + (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
+                config.frontLeft.setPower((driveVertical + (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
+                config.backLeft.setPower((driveVertical - (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
+            } else {
+                //basic mecanum code (MAKE STICK INPUTS NEGATIVE TO CHANGE ROBOT DIRECTION (RIGHT STICK ONLY!!!!)) !!!!!!!!!!!!!!!!
+                config.frontLeft.setPower((gamepad1.right_stick_y - (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
+                config.backLeft.setPower((gamepad1.right_stick_y + (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
+                config.frontRight.setPower((gamepad1.right_stick_y + (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
+                config.backRight.setPower((gamepad1.right_stick_y - (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
+            }
+
+            // Show the elapsed game time and wheel power.
+            telemetry.addData("game1 right stick y", gamepad1.right_stick_y);
+            telemetry.addData("game1 right stick x", gamepad1.right_stick_x);
+            telemetry.addData("game1 left trigger", gamepad1.left_trigger);
+            telemetry.addData("game1 right trigger", gamepad1.right_trigger);
+            telemetry.addData("Status", "Run Time" + runtime);
+            telemetry.update();
+        }
+    }
+}

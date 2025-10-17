@@ -1,0 +1,26 @@
+This document is a good idea because it allows you to keep track of the config. That being said, currently (2/22/24) this doc is out of date.
+I may fix it, and if I do I'll leave a little doodle here:
+()()
+(*_*)
+(    )*
+
+motor encoder slot 0 on control forward/backward odometry
+motor encoder slot 1 on control hub strafe odometry
+
+
+configuration:
+
+control hub
+
+...
+
+IC2 bus 0 imu
+
+Expansion hub
+
+...
+
+
+ ^..^
+((oo))
+( uu ) -Bubbles 11/01/2024 :)

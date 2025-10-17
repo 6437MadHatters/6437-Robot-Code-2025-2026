@@ -1,0 +1,37 @@
+Win this season for me. At least keep 3188 out of worlds.
+
+Love you Bubbles <3
+-Nolan Reitz
+
+P.S. Don't hesitate to call/text with any questions you may have. Even as I'm writing this I wish I could be writing more code for our robot.
+(307)-272-4326
+anolreitz@icloud.com
+
+/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\
+
+Whoever is next, keep winning. Don't make 6437 bad.
+-Bubbles
+
+P.S. I have contact info too, but it probably won't help that much
+(307)-254-7485
+streeterbubbles@gmail.com
+
+TO DO LIST
+- ...
+
+!!! PRE-MATCH CHECKLIST !!!
+- fresh battery !!!!!!!!!!!
+- sensors plugged in
+- check alliance colors
+- ...
+
+ROADRUNNER VERY NECESSARY
+Here's the instructions to tune Road Runner https://rr.brott.dev/docs/v1-0/tuning
+Go to http://192.168.43.1:8080/dash Under mecanum drive -> PARAMS you will be able to adjust all of these values.
+Obviously you should change these values in the code below as well.
+If you get stuck or lost, there's always a Youtube tutorial https://www.youtube.com/watch?v=26ghjpkJwyM -I know this is for v1.0 but the tuning process is near identical
+ ^..^
+((oo))
+( uu )     - Bubbles
+
+Control hub Orientation (this is only important for two wheel) https://ftc-docs.firstinspires.org/en/latest/programming_resources/imu/imu.html?highlight=imu#physical-hub-mounting
