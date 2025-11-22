@@ -10,14 +10,12 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 
-import java.util.concurrent.TimeUnit;
-
 
 @TeleOp(name = "teleOp", group = "Linear OpMode")
 public class teleOp extends LinearOpMode {
 
     // Declare OpMode variables.
-    // elapsed Time
+    // time
     private final ElapsedTime runtime = new ElapsedTime();
 
     // these variables are for headless mode, I don't really understand it, I stole them from 3189
@@ -36,21 +34,20 @@ public class teleOp extends LinearOpMode {
     // whether or not headless mode is on
     boolean headlessMode = false;
 
-    // release servo variables
-    static double hold = 0;
-    static double drop = .2;
-
-    // shooter toggle variables
-    boolean shooterOneToggle = false;
-
-    // class variables. Just config right now
-    Configuration config;
-
-    // method syncing shooter motors
-    public void shooterPower(double motorPower) {
-        config.shooterLeft.setPower(motorPower);
-        config.shooterRight.setPower(motorPower);
+    // trigger states -_- these are annoying af
+    boolean lastTrigger = false;
+    // method for button ...
+    boolean triggerTap(double triggerValue) {
+        boolean isPressed = triggerValue > 0.5;
+        boolean tapped = isPressed && !lastTrigger;
+        lastTrigger = isPressed;
+        return tapped;
     }
+
+    // class variables.
+    Configuration config;
+    Methods method;
+    BotState state;
 
     // START RUNNING !!! \/
 
@@ -59,8 +56,10 @@ public class teleOp extends LinearOpMode {
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
-        // initialize the config variable with the proper argument. !!!!! IMPORTANT
+        // initialize ALL other classes with the proper class argument. !!!!! IMPORTANT
         config = new Configuration(hardwareMap);
+        method = new Methods(config);
+        state = new BotState(config, method);
 
         // define all the button objects that will use the button class
         // gamepad 1
@@ -90,7 +89,7 @@ public class teleOp extends LinearOpMode {
         Button gamepad2_Right_bumper = new Button(gamepad2.right_bumper);
         Button gamepad2_Left_bumper = new Button(gamepad2.left_bumper);
 
-        // initialize the gyro (we don't actually use it anywhere)
+        // initialize the gyro (we only use it for driving)
         BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
         parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
         parameters.calibrationDataFile = "BNO055IMUCalibration.json";
@@ -98,14 +97,15 @@ public class teleOp extends LinearOpMode {
         imu.initialize(parameters);
 
         // INIT POSITION
-        // shooter off and servo set to 0
+        state.setBot(BotState.botState.idle);
+        state.updateBotState(false, false, false, false, telemetry);
 
         // tell when init is done
         telemetry.addLine("init done");
         telemetry.update();
 
         waitForStart();
-        // restart the timer
+        // START THE TIMER WHEN ROBOT STARTS
         runtime.reset();
         long savedTime = 0;
 
@@ -140,69 +140,65 @@ public class teleOp extends LinearOpMode {
             gamepad2_Right_bumper.update(gamepad2.right_bumper);
             gamepad2_Left_bumper.update(gamepad2.left_bumper);
 
-            // MANUAL CONTROL !!! \/
-            // toggle release (make a method that takes a servo as an argument and use it for all releases)
-            if (gamepad1A.buttonPress()) {
-                config.releaseLeft.setPosition(drop);
-                config.releaseMiddle.setPosition(drop);
-                config.releaseRight.setPosition(drop);
-                sleep(750);
-                config.releaseLeft.setPosition(hold);
-                config.releaseMiddle.setPosition(hold);
-                config.releaseRight.setPosition(hold);
+            // BOT STATE MACHINE (change states!!!)
+            // Shoot One
+            if (triggerTap(gamepad1.right_trigger)) {
+                if (state.getBotState() != BotState.botState.shootOne) {
+                    state.setBot(BotState.botState.shootOne);
+                } else {
+                    state.setBot(BotState.botState.idle);
+                }
             }
 
-            // drop left
-            if (gamepad1X.buttonPress()) {
-                config.releaseLeft.setPosition(drop);
-                sleep(750);
-                config.releaseLeft.setPosition(hold);
+            // Shoot Three
+             if (gamepad1_Right_bumper.buttonPress()) {
+                if (state.getBotState() != BotState.botState.shootThree) {
+                    state.setBot(BotState.botState.shootThree);
+                } else {
+                    state.setBot(BotState.botState.idle);
+                }
             }
 
-            // drop middle
-            if (gamepad1Y.buttonPress()) {
-                config.releaseMiddle.setPosition(drop);
-                sleep(750);
-                config.releaseMiddle.setPosition(hold);
+             // Intake
+             if (gamepad1_Left_bumper.buttonPress()){
+                if (state.getBotState() != BotState.botState.intake) {
+                    state.setBot(BotState.botState.intake);
+                } else {
+                    state.setBot(BotState.botState.idle);
+                }
             }
 
-            // drop right
-            if (gamepad1B.buttonPress()) {
-                config.releaseRight.setPosition(drop);
-                sleep(750);
-                config.releaseRight.setPosition(hold);
-            }
+             // Eject
+             if (gamepad1.left_trigger > .5) {
+                 state.setBot(BotState.botState.eject);
+             } else if (state.getBotState() == BotState.botState.eject) {
+                 state.setBot(BotState.botState.idle);
+             }
 
-            // toggle shooter on/off (don't forget to add both motors)
-            if (gamepad1_Right_bumper.buttonPress()) {
-                shooterOneToggle = !shooterOneToggle;
-            }
-            if (shooterOneToggle) {
-                shooterPower(.85);
-            } else {
-                shooterPower(0);
-            }
+            // UPDATE BOT STATE EVERY ITERATION OF THE LOOP (arguments are for buttons that are used in updateBotState)
+            state.updateBotState(
+                    (gamepad1A.buttonPress()),
+                    (gamepad1B.buttonPress()),
+                    (gamepad1X.buttonPress()),
+                    (gamepad1Y.buttonPress()),
+                    telemetry
+            );
 
-            // toggle intake...
+            telemetry.addData("Current State", state.getBotState());
 
-            // telemetry
-            telemetry.addData("releaseLeft pose", config.releaseLeft.getPosition());
-            telemetry.addData("releaseMiddle pose", config.releaseMiddle.getPosition());
-            telemetry.addData("releaseRight pose", config.releaseRight.getPosition());
-            telemetry.addData("shooter power", config.shooterLeft.getPower());
 
             // DRIVE !!! \/
 
-            // headless mode toggle
-            if (gamepad1Y.buttonPress()) {
+            // headless mode toggle (right stick toggle headless, left stick reset gyro)
+            if (gamepad1_right_stick_button.buttonPress()) {
                 headlessMode = !headlessMode;
             }
             telemetry.addData("Headless Mode", headlessMode);
 
             // SPEED
-            double turnMultiplier = .85;
+            double turnMultiplier = .9;
 
-            telemetry.addData("turn multiplier (drive speed): ", turnMultiplier);
+            // telemetry.addData("turn multiplier (drive speed): ", turnMultiplier);
 
             //drive code, I don't really understand much.
             if (headlessMode) {
@@ -239,17 +235,17 @@ public class teleOp extends LinearOpMode {
                     gamepadDegree = 0;
                 }
 
-                // RESET GYRO IF NEEDED !!!
-                if (gamepad1.x) {
+                // RESET GYRO IF NEEDED !!!!!!!!!!!!
+                if (gamepad1.left_stick_button) {
                     imu.initialize(parameters);
                 }
 
-                telemetry.addData("runtime - saved time", runtime.now(TimeUnit.MILLISECONDS) - savedTime);
+                // telemetry.addData("runtime - saved time", runtime.now(TimeUnit.MILLISECONDS) - savedTime);
 
                 //ANGLE MATH
                 //gives us the angle our robot is at
                 robotDegree = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle + 180;
-                telemetry.addData("Robot degree", robotDegree);
+                // telemetry.addData("Robot degree", robotDegree);
                 //find angle relative to robot position
                 movementDegree = gamepadDegree - robotDegree;
                 //by finding the adjacent side, we can find sideways movement relative to robot
@@ -263,24 +259,24 @@ public class teleOp extends LinearOpMode {
                 //drive math
                 double strafeSpeed = 1.5;
                 driveTurn *= .85; // yaw speed
-                config.frontRight.setPower((driveVertical - (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
-                config.backRight.setPower((driveVertical + (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
-                config.frontLeft.setPower((driveVertical + (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
-                config.backLeft.setPower((driveVertical - (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
+                config.frontRight.setPower((-driveVertical + (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
+                config.backRight.setPower((-driveVertical - (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
+                config.frontLeft.setPower((-driveVertical - (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
+                config.backLeft.setPower((-driveVertical + (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
             } else {
                 //basic mecanum code (MAKE STICK INPUTS NEGATIVE TO CHANGE ROBOT DIRECTION (RIGHT STICK ONLY!!!!)) !!!!!!!!!!!!!!!!
-                config.frontLeft.setPower((gamepad1.right_stick_y - (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
-                config.backLeft.setPower((gamepad1.right_stick_y + (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
-                config.frontRight.setPower((gamepad1.right_stick_y + (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
-                config.backRight.setPower((gamepad1.right_stick_y - (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
+                config.frontLeft.setPower((-gamepad1.right_stick_y + (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
+                config.backLeft.setPower((-gamepad1.right_stick_y - (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
+                config.frontRight.setPower((-gamepad1.right_stick_y - (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
+                config.backRight.setPower((-gamepad1.right_stick_y + (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
             }
 
             // Show the elapsed game time and wheel power.
-            telemetry.addData("game1 right stick y", gamepad1.right_stick_y);
-            telemetry.addData("game1 right stick x", gamepad1.right_stick_x);
-            telemetry.addData("game1 left trigger", gamepad1.left_trigger);
-            telemetry.addData("game1 right trigger", gamepad1.right_trigger);
-            telemetry.addData("Status", "Run Time" + runtime);
+            // telemetry.addData("game1 right stick y", gamepad1.right_stick_y);
+            // telemetry.addData("game1 right stick x", gamepad1.right_stick_x);
+            // telemetry.addData("game1 left trigger", gamepad1.left_trigger);
+            // telemetry.addData("game1 right trigger", gamepad1.right_trigger);
+            // telemetry.addData("Status", "Run Time" + runtime);
             telemetry.update();
         }
     }
