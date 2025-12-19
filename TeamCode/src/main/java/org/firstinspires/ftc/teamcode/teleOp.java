@@ -10,6 +10,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 
+import org.firstinspires.ftc.teamcode.BotState.botState;
+
 
 @TeleOp(name = "teleOp", group = "Linear OpMode")
 public class teleOp extends LinearOpMode {
@@ -59,7 +61,7 @@ public class teleOp extends LinearOpMode {
         // initialize ALL other classes with the proper class argument. !!!!! IMPORTANT
         config = new Configuration(hardwareMap);
         method = new Methods(config);
-        state = new BotState(config, method);
+        state = new BotState(config, method, telemetry);
 
         // define all the button objects that will use the button class
         // gamepad 1
@@ -97,8 +99,8 @@ public class teleOp extends LinearOpMode {
         imu.initialize(parameters);
 
         // INIT POSITION
-        state.setBot(BotState.botState.idle);
-        state.updateBotState(false, false, false, false, telemetry);
+        state.setBot(botState.idle);
+        state.updateBotState(false, false, false, false);
 
         // tell when init is done
         telemetry.addLine("init done");
@@ -143,36 +145,36 @@ public class teleOp extends LinearOpMode {
             // BOT STATE MACHINE (change states!!!)
             // Shoot One
             if (triggerTap(gamepad1.right_trigger)) {
-                if (state.getBotState() != BotState.botState.shootOne) {
-                    state.setBot(BotState.botState.shootOne);
+                if (state.getBotState() != botState.slowSpeed) {
+                    state.setBot(botState.slowSpeed);
                 } else {
-                    state.setBot(BotState.botState.idle);
+                    state.setBot(botState.idle);
                 }
             }
 
             // Shoot Three
              if (gamepad1_Right_bumper.buttonPress()) {
-                if (state.getBotState() != BotState.botState.shootThree) {
-                    state.setBot(BotState.botState.shootThree);
+                if (state.getBotState() != botState.fastSpeed) {
+                    state.setBot(botState.fastSpeed);
                 } else {
-                    state.setBot(BotState.botState.idle);
+                    state.setBot(botState.idle);
                 }
             }
 
              // Intake
              if (gamepad1_Left_bumper.buttonPress()){
-                if (state.getBotState() != BotState.botState.intake) {
-                    state.setBot(BotState.botState.intake);
+                if (state.getBotState() != botState.intake) {
+                    state.setBot(botState.intake);
                 } else {
-                    state.setBot(BotState.botState.idle);
+                    state.setBot(botState.idle);
                 }
             }
 
              // Eject
              if (gamepad1.left_trigger > .5) {
-                 state.setBot(BotState.botState.eject);
-             } else if (state.getBotState() == BotState.botState.eject) {
-                 state.setBot(BotState.botState.idle);
+                 state.setBot(botState.eject);
+             } else if (state.getBotState() == botState.eject) {
+                 state.setBot(botState.idle);
              }
 
             // UPDATE BOT STATE EVERY ITERATION OF THE LOOP (arguments are for buttons that are used in updateBotState)
@@ -180,8 +182,7 @@ public class teleOp extends LinearOpMode {
                     (gamepad1A.buttonPress()),
                     (gamepad1B.buttonPress()),
                     (gamepad1X.buttonPress()),
-                    (gamepad1Y.buttonPress()),
-                    telemetry
+                    (gamepad1Y.buttonPress())
             );
 
             telemetry.addData("Current State", state.getBotState());
@@ -258,7 +259,8 @@ public class teleOp extends LinearOpMode {
 
                 //drive math
                 double strafeSpeed = 1.5;
-                driveTurn *= .85; // yaw speed
+                driveTurn *= .7;
+                // yaw speed
                 config.frontRight.setPower((-driveVertical + (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
                 config.backRight.setPower((-driveVertical - (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
                 config.frontLeft.setPower((-driveVertical - (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);

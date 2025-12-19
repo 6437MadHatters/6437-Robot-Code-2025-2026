@@ -5,6 +5,7 @@ import com.acmerobotics.roadrunner.DualNum;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Time;
+import com.acmerobotics.roadrunner.Twist2d;
 import com.acmerobotics.roadrunner.Twist2dDual;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.Vector2dDual;
@@ -22,9 +23,10 @@ import org.firstinspires.ftc.teamcode.RRProgs.messages.ThreeDeadWheelInputsMessa
 @Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
     public static class Params {
-        public double par0YTicks =  -3568.8886105567008; // y position of the first parallel encoder (in tick units)
-        public double par1YTicks = 3926.132538607708; // y position of the second parallel encoder (in tick units)
-        public double perpXTicks = 2451.852248266234; // x position of the perpendicular encoder (in tick units)
+        public double par0YTicks =  -3778.7413730307912; // y position of the first parallel encoder (in tick units)
+        public double par1YTicks = 3739.472347004255; // y position of the second parallel encoder (in tick units)
+        public double perpXTicks = 2960.2359895222885; // x position of the perpendicular encoder (in tick units)
+        public double headingScale = 0.96; // scale the heading cause weight distribution is jank - BUBBLES!!!!!!!
     }
 
     public static Params PARAMS = new Params();
@@ -101,7 +103,7 @@ public final class ThreeDeadWheelLocalizer implements Localizer {
                         }).times(inPerTick)
                 ),
                 new DualNum<>(new double[] {
-                        (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
+                        (par0PosDelta - par1PosDelta) / (PARAMS.par0YTicks - PARAMS.par1YTicks) * PARAMS.headingScale, // SCALE THE HEADING!!!!! - BUBBLES
                         (par0PosVel.velocity - par1PosVel.velocity) / (PARAMS.par0YTicks - PARAMS.par1YTicks),
                 })
         );

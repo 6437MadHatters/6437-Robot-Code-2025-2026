@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx; // extended version of DcMotor class... this one is muchh better
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -21,6 +22,9 @@ public class Configuration {
     Servo releaseRight;
     Servo angleLeft;
     Servo angleRight;
+    ColorSensor colorLeft;
+    ColorSensor colorMid;
+    ColorSensor colorRight;
 
     public Configuration(HardwareMap hardwareMap) {
         //just define the motors and stuff
@@ -36,6 +40,9 @@ public class Configuration {
         releaseRight = hardwareMap.get(Servo.class, "releaseRight");
         angleLeft = hardwareMap.get(Servo.class, "angleLeft");
         angleRight = hardwareMap.get(Servo.class, "angleRight");
+        colorLeft = hardwareMap.get(ColorSensor.class, "colorLeft");
+        colorMid = hardwareMap.get(ColorSensor.class, "colorMiddle");
+        colorRight = hardwareMap.get(ColorSensor.class, "colorRight");
 
 
         //I like to set the direction to forwards, even though it already does that, so that I can visualize what motors are doing what
