@@ -85,14 +85,14 @@ public class RRTrajectoryTest extends LinearOpMode {
                 Actions.runBlocking(
                         new ParallelAction(
                             new SequentialAction(
-                                    state.setBotAction(botState.slowSpeed, false, false, false, false),
+                                    state.setBotAction(botState.slowSpeed, false, false, false, false, false),
                                     strafeAroundSideOne.build(),
-                                    state.setBotAction(botState.slowSpeed, true, false, false, false),
+                                    state.setBotAction(botState.slowSpeed, false, true, false, false, false),
                                     //state.setBotAction(botState.idle, false, false, false, false),
                                     strafeAroundSideTwo.build(),
-                                    state.setBotAction(botState.intake, false, false, false, false),
+                                    state.setBotAction(botState.intake, false, false, false, false, false),
                                     strafeAroundSideThree.build(),
-                                    state.setBotAction(botState.idle, false, false, false, false),
+                                    state.setBotAction(botState.idle, false, false, false, false, false),
                                     strafeAroundSideFour.build()
                             ),
                         state.updateStateAction()

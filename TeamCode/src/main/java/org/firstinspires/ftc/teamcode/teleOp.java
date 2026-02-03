@@ -191,13 +191,13 @@ public class teleOp extends LinearOpMode {
             // DRIVE !!! \/
 
             // headless mode toggle (right stick toggle headless, left stick reset gyro)
-            if (gamepad1_right_stick_button.buttonPress()) {
+            /* if (gamepad1_right_stick_button.buttonPress()) {
                 headlessMode = !headlessMode;
-            }
+            } */
             telemetry.addData("Headless Mode", headlessMode);
 
             // SPEED
-            double turnMultiplier = .9;
+            double turnMultiplier = .85;
 
             // telemetry.addData("turn multiplier (drive speed): ", turnMultiplier);
 

@@ -1,9 +1,11 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx; // extended version of DcMotor class... this one is muchh better
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.Servo.Direction;
@@ -23,11 +25,15 @@ public class Configuration {
     Servo angleLeft;
     Servo angleRight;
     ColorSensor colorLeft;
+    DistanceSensor rangeLeft;
     ColorSensor colorMid;
+    DistanceSensor rangeMid;
     ColorSensor colorRight;
+    DistanceSensor rangeRight;
+    Limelight3A limelight;
 
     public Configuration(HardwareMap hardwareMap) {
-        //just define the motors and stuff
+        // define the motors and stuff
         frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         backRight = hardwareMap.get(DcMotorEx.class, "backRight");
         frontLeft = hardwareMap.get(DcMotorEx.class, "frontLeft");
@@ -41,8 +47,12 @@ public class Configuration {
         angleLeft = hardwareMap.get(Servo.class, "angleLeft");
         angleRight = hardwareMap.get(Servo.class, "angleRight");
         colorLeft = hardwareMap.get(ColorSensor.class, "colorLeft");
+        rangeLeft = hardwareMap.get(DistanceSensor.class, "colorLeft");
         colorMid = hardwareMap.get(ColorSensor.class, "colorMiddle");
+        rangeMid = hardwareMap.get(DistanceSensor.class, "colorMiddle");
         colorRight = hardwareMap.get(ColorSensor.class, "colorRight");
+        rangeRight = hardwareMap.get(DistanceSensor.class, "colorRight");
+        limelight = hardwareMap.get(Limelight3A.class, "Limelight 3A");
 
 
         //I like to set the direction to forwards, even though it already does that, so that I can visualize what motors are doing what
@@ -52,12 +62,12 @@ public class Configuration {
         backLeft.setDirection(DcMotorEx.Direction.REVERSE);
         shooterLeft.setDirection(DcMotorEx.Direction.REVERSE);
         shooterRight.setDirection(DcMotorEx.Direction.FORWARD);
-        intakeMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        intakeMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         releaseLeft.setDirection(Direction.REVERSE);
         releaseMiddle.setDirection(Direction.REVERSE);
         releaseRight.setDirection(Direction.FORWARD);
-        angleLeft.setDirection(Direction.REVERSE);
-        angleRight.setDirection(Direction.FORWARD);
+        angleLeft.setDirection(Direction.FORWARD);
+        angleRight.setDirection(Direction.REVERSE);
 
         //Brake or float, you should usually use brake. This means that the motor will not go limp, but instead try to resist movement.
         frontRight.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);

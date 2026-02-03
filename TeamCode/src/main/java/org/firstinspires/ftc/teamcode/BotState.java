@@ -29,7 +29,6 @@ public class BotState {
     double currentAngle;
     // ready to shoot
     boolean readyToShoot = false; // check if the flywheel is up to speed
-    boolean shotThisSet = false; // check if the robot has shot since the state changed
 
     // STATES
     enum botState {
@@ -67,6 +66,10 @@ public class BotState {
             method.intakePower(.9);
             method.shooterPower(0);
             currentAngle = angleUp;
+
+            // flick
+            method.flickOut(allA);
+
         } else if (currentState == botState.eject) {
             method.intakePower(-.5);
             method.shooterPower(0);
@@ -115,9 +118,14 @@ public class BotState {
 
         // telemetry
         telemetry.addData("angle pose", currentAngle);
-        telemetry.addData("left state", method.getLeftState());
-        telemetry.addData("middle state", method.getMidState());
-        telemetry.addData("right state", method.getRightState());
+        telemetry.addData("middle drop state", method.getMidState());
+        telemetry.addData("right drop state", method.getRightState());
+        telemetry.addData("left drop state", method.getLeftState());
+        telemetry.addData("left color", method.getBallColor("left"));
+        telemetry.addData("middle color", method.getBallColor("mid"));
+        telemetry.addData("right color", method.getBallColor("right"));
+        // telemetry.addData("dist", method.getSensedDist()); // distance test
+        // telemetry.addData("hue", method.getHue()); // hue test
     }
 
     // bot state getter
@@ -126,31 +134,62 @@ public class BotState {
     }
 
     // RR ACTION TO CHANGE STATE INSTANTANEOUSLY (until a drop completes (or doesn't even start))
-    public Action setBotAction (botState state, boolean allA, boolean righB, boolean leftX, boolean middleY) {
+    public Action setBotAction (botState state, boolean usePattern, boolean allA, boolean rightB, boolean leftX, boolean middleY) {
         return new Action() {
-
-            boolean firstLoop = true; // first loop the servos are all idle anyway
+            boolean shotStarted = false; // boolean to check if servo fsm has started
+            boolean latched = false; // latch shots if using pattern
+            boolean shootRight, shootLeft, shootMid; // shoot booleans for patterns only
 
             public boolean run(@NonNull TelemetryPacket packet) {
+
                 rrSetState = state;
-                rrAllA = allA;
-                rrRightB = righB;
-                rrLeftX = leftX;
-                rrMiddleY = middleY;
 
-                if (firstLoop) {
-                    firstLoop = false;
-                    return true;
-                }
+                boolean needsToShoot = usePattern || allA || rightB || leftX || middleY; // check if we even requested to shoot.
 
-                if (!method.isShotInProgress()) {
+                if (usePattern) {
+                    if (!latched) { // latch pattern shots
+                        shootRight = method.shouldShoot("right");
+                        shootLeft  = method.shouldShoot("left");
+                        shootMid   = method.shouldShoot("mid");
+                        latched = true;
+                    }
                     rrAllA = false;
-                    rrRightB = false;
-                    rrLeftX = false;
-                    rrMiddleY = false;
+                    rrRightB = shootRight;
+                    rrLeftX  = shootLeft;
+                    rrMiddleY = shootMid;
+                } else {
+                    rrAllA = allA;
+                    rrRightB = rightB;
+                    rrLeftX = leftX;
+                    rrMiddleY = middleY;
                 }
 
-                return method.isShotInProgress();
+                // stop and wait for shooter to spin up if we're in position to shoot
+                if (state == botState.slowSpeed || state == botState.fastSpeed) {
+
+                    if (!needsToShoot || (!rrAllA && !rrRightB && !rrLeftX && !rrMiddleY)) {
+                        return false; // stop if there's nothing to shoot
+                    }
+
+                    if (!readyToShoot) {
+                        return true; // wait for flywheel
+                    }
+
+                     if (method.isShotInProgress()) {
+                        shotStarted = true; // shot is currently happening
+                        return true;
+                    }
+
+                    if (shotStarted && !method.isShotInProgress()) {
+                        rrAllA = rrRightB = rrLeftX = rrMiddleY = false; // shot finished
+                        method.rearrangePattern();
+                        return false;
+                    }
+
+                    return true; // ready, but shot hasn’t started yet
+                }
+
+                return false; // not in a shooting state
             }
         };
     }
