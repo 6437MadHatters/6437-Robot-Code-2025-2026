@@ -74,7 +74,7 @@ public class RRTrajectoryTest extends LinearOpMode {
 
         // INIT POSITION
         state.setBot(botState.idle);
-        state.updateBotState(false, false, false, false);
+        state.updateBotState(false, false, false, false, 0, 45);
 
         // run until the auto ends or time runs out (or driver presses STOP)
         boolean running = true;
@@ -85,9 +85,9 @@ public class RRTrajectoryTest extends LinearOpMode {
                 Actions.runBlocking(
                         new ParallelAction(
                             new SequentialAction(
-                                    state.setBotAction(botState.slowSpeed, false, false, false, false, false),
+                                    state.setBotAction(botState.shoot, false, false, false, false, false),
                                     strafeAroundSideOne.build(),
-                                    state.setBotAction(botState.slowSpeed, false, true, false, false, false),
+                                    state.setBotAction(botState.shoot, false, true, false, false, false),
                                     //state.setBotAction(botState.idle, false, false, false, false),
                                     strafeAroundSideTwo.build(),
                                     state.setBotAction(botState.intake, false, false, false, false, false),

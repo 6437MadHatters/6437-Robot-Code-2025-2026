@@ -19,6 +19,7 @@ public class Configuration {
     DcMotorEx shooterLeft;
     DcMotorEx shooterRight;
     DcMotorEx intakeMotor;
+    DcMotorEx liftMotor;
     Servo releaseLeft;
     Servo releaseMiddle;
     Servo releaseRight;
@@ -41,6 +42,7 @@ public class Configuration {
         shooterLeft = hardwareMap.get(DcMotorEx.class, "shooterLeft");
         shooterRight = hardwareMap.get(DcMotorEx.class, "shooterRight");
         intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
+        liftMotor = hardwareMap.get(DcMotorEx.class, "lift");
         releaseLeft = hardwareMap.get(Servo.class, "releaseLeft");
         releaseMiddle = hardwareMap.get(Servo.class, "releaseMiddle");
         releaseRight = hardwareMap.get(Servo.class, "releaseRight");
@@ -63,6 +65,7 @@ public class Configuration {
         shooterLeft.setDirection(DcMotorEx.Direction.REVERSE);
         shooterRight.setDirection(DcMotorEx.Direction.FORWARD);
         intakeMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        liftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         releaseLeft.setDirection(Direction.REVERSE);
         releaseMiddle.setDirection(Direction.REVERSE);
         releaseRight.setDirection(Direction.FORWARD);
@@ -74,8 +77,9 @@ public class Configuration {
         backRight.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
         frontLeft.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
         backLeft.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
-        shooterLeft.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
-        shooterRight.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+        //shooterLeft.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE); // shooter doesn't need to brake
+        //shooterRight.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE); // shooter doesn't need to brake
         intakeMotor.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+        //liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); // it's countersprung
     }
 }

@@ -3,6 +3,8 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
@@ -36,7 +38,7 @@ public class teleOp extends LinearOpMode {
     // whether or not headless mode is on
     boolean headlessMode = false;
 
-    // trigger states -_- these are annoying af
+    // controller trigger states -_- these are annoying af
     boolean lastTrigger = false;
     // method for button ...
     boolean triggerTap(double triggerValue) {
@@ -45,6 +47,20 @@ public class teleOp extends LinearOpMode {
         lastTrigger = isPressed;
         return tapped;
     }
+
+    // lift state... this is also annoying
+    boolean goUp = false;
+
+    // I HATE THIS
+    enum shootMode {
+        far,
+        close,
+        none
+    }
+    shootMode currentShootMode = shootMode.none;
+
+    int rpm = 0;
+    double angle = 60;
 
     // class variables.
     Configuration config;
@@ -62,6 +78,9 @@ public class teleOp extends LinearOpMode {
         config = new Configuration(hardwareMap);
         method = new Methods(config);
         state = new BotState(config, method, telemetry);
+
+        // variable to track what state we're in
+        botState lastState = botState.idle;
 
         // define all the button objects that will use the button class
         // gamepad 1
@@ -99,8 +118,12 @@ public class teleOp extends LinearOpMode {
         imu.initialize(parameters);
 
         // INIT POSITION
+        config.liftMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+        config.liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        method.updateLift(goUp);
+
         state.setBot(botState.idle);
-        state.updateBotState(false, false, false, false);
+        state.updateBotState(false, false, false, false, rpm, angle);
 
         // tell when init is done
         telemetry.addLine("init done");
@@ -143,21 +166,31 @@ public class teleOp extends LinearOpMode {
             gamepad2_Left_bumper.update(gamepad2.left_bumper);
 
             // BOT STATE MACHINE (change states!!!)
-            // Shoot One
+            // shoot close mode
             if (triggerTap(gamepad1.right_trigger)) {
-                if (state.getBotState() != botState.slowSpeed) {
-                    state.setBot(botState.slowSpeed);
+                if (currentShootMode != shootMode.close) {
+                    state.setBot(botState.shoot);
+                    lastState = botState.shoot;
+                    rpm = 2500;
+                    angle = 60;
+                    currentShootMode = shootMode.close;
                 } else {
                     state.setBot(botState.idle);
+                    lastState = botState.idle;
                 }
             }
 
-            // Shoot Three
-             if (gamepad1_Right_bumper.buttonPress()) {
-                if (state.getBotState() != botState.fastSpeed) {
-                    state.setBot(botState.fastSpeed);
+            // shoot far mode
+            if (gamepad1_Right_bumper.buttonPress()) {
+                if (currentShootMode != shootMode.far) {
+                    state.setBot(botState.shoot);
+                    lastState = botState.shoot;
+                    rpm = 3200;
+                    angle = 50;
+                    currentShootMode = shootMode.far;
                 } else {
                     state.setBot(botState.idle);
+                    lastState = botState.idle;
                 }
             }
 
@@ -165,8 +198,10 @@ public class teleOp extends LinearOpMode {
              if (gamepad1_Left_bumper.buttonPress()){
                 if (state.getBotState() != botState.intake) {
                     state.setBot(botState.intake);
+                    lastState = botState.intake;
                 } else {
                     state.setBot(botState.idle);
+                    lastState = botState.idle;
                 }
             }
 
@@ -177,15 +212,32 @@ public class teleOp extends LinearOpMode {
                  state.setBot(botState.idle);
              }
 
+             // Lift
+            if (gamepad1Dpad_Up.buttonPress()) {
+                config.liftMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+                config.liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                state.setBot(botState.idle);
+                goUp = true;
+            }
+            method.updateLift(goUp);
+
             // UPDATE BOT STATE EVERY ITERATION OF THE LOOP (arguments are for buttons that are used in updateBotState)
             state.updateBotState(
                     (gamepad1A.buttonPress()),
                     (gamepad1B.buttonPress()),
                     (gamepad1X.buttonPress()),
-                    (gamepad1Y.buttonPress())
+                    (gamepad1Y.buttonPress()),
+                    rpm,
+                    angle
             );
 
+            if (state.getBotState() != botState.shoot) {
+                currentShootMode = shootMode.none; // set the currentShootMode to none if we aren't shooting.
+            }
+
             telemetry.addData("Current State", state.getBotState());
+            telemetry.addData("lift position", config.liftMotor.getCurrentPosition());
+            telemetry.addData("lift power", config.liftMotor.getPower());
 
 
             // DRIVE !!! \/

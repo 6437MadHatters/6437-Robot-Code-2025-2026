@@ -11,8 +11,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
-import java.util.Arrays;
-
 public class Methods {
 
     // config variable!!
@@ -24,6 +22,12 @@ public class Methods {
     }
 
     // VARIABLES
+
+    // LIFT VARIABLES
+    int topTicks = 675;
+    double liftUpPower = 1;
+    double liftHoldPower = 0.15;
+    double sinkDownPower = 0.25;
 
     // INTAKE VARIABLES
     ColorSensor colorSensor;
@@ -57,7 +61,7 @@ public class Methods {
     int totError = 0;
     int loopNum = 0;
     int avgError = 0;
-    int targetRPM = 0; // seperate variable to get targetRPM in other classes
+    int targetRPM = 0; // separate variable to get targetRPM in other classes
 
     // ANGLE CHANGE VARIABLES
     // ?
@@ -66,29 +70,49 @@ public class Methods {
     private final ElapsedTime leftDropTimer = new ElapsedTime(); // timers for servo state machines
     private final ElapsedTime midDropTimer = new ElapsedTime();
     private final ElapsedTime rightDropTimer = new ElapsedTime();
+    private final ElapsedTime scoopTimer = new ElapsedTime();
 
-    enum launchState {
-        idle,
-        flicking,
-        dropping,
-        returning,
-        finished
+    enum servoState {
+        idle, // not moving
+        flicking, // middle drop/flick servo
+        going, // dropping servos/moving to temporary position
+        returning, // returning to original position
+        finished // done moving
     }
 
-    launchState leftState = launchState.idle;
-    launchState midState = launchState.idle;
-    launchState rightState = launchState.idle;
+    servoState leftState = servoState.idle;
+    servoState midState = servoState.idle;
+    servoState rightState = servoState.idle;
+    servoState scoopState = servoState.idle;
     boolean flickStarted = false;
     boolean leftStarted = false;
     boolean midStarted = false;
     boolean rightStarted = false;
-    boolean shotInProgress = false;
+    boolean armsMoving = false;
+    boolean scoopStarted = false;
+    boolean scoopMoving = false;
     double out = .14;
     double hold = .29;
     double drop = .44;
-    double dropServoWait = .5;
+    int scoopAngle = 45;
+    double servoWait = .5;
 
     // ACTUAL METHODS
+
+    // LIFT CONTROL
+    public void updateLift(boolean goUp) {
+        int current = config.liftMotor.getCurrentPosition();
+        if (goUp) {
+            if (current < topTicks) {
+                config.liftMotor.setPower(liftUpPower); // power until the arm is past physically perpendicular with floor
+            } else {
+                config.liftMotor.setPower(liftHoldPower); // passed the middle, sink down to mechanical hard stop
+            }
+        }
+        else {
+            config.liftMotor.setPower(0);
+        }
+    } // CANNOT BE UNDONE: WHEN DPAD_DOWN IS PRESSED IN TELEOP THE BOT WILL LIFT AND STAY UP
 
     // INTAKE CONTROL
     // set intake power
@@ -169,13 +193,20 @@ public class Methods {
         }
     }
 
+    // check if ANY shooter matches the pattern
+    public boolean anyShooterMatches() {
+        return currentPattern[0] == getBallColor("left") || currentPattern[0] == getBallColor("mid")  || currentPattern[0] == getBallColor("right");
+    }
+
     // return true to shoot if the specific shooter should shoot
     public boolean shouldShoot(String whichShooter){
-        // check if the next item in the current pattern matches the current shooter
-        if (currentPattern[0] == getBallColor(whichShooter)){
-            return true;
-        } else if ((currentPattern[0] == ballColor.unknown) && (currentPattern[1] == ballColor.unknown) && (currentPattern[2] == ballColor.unknown)) {
-            return true; // just return true here for everything, not worth running rearrange. only if no april tag is recognized
+
+        if (getBallColor(whichShooter) == currentPattern[0]){
+            return true; // if the ball matches the pattern, shoot
+        } else if ((currentPattern[0] == ballColor.unknown) && (getBallColor(whichShooter) != ballColor.empty)) {
+            return true; // if no april tag is recognized just shoot one
+        } else if (getBallColor(whichShooter) != ballColor.empty && !anyShooterMatches()) {
+            return true; // just dump if the shooter has a ball and nothing matches the pattern
         } else {
             return false;
         }
@@ -280,10 +311,10 @@ public class Methods {
     // convert angle to servo position
     public double angleToPos(double angle) {
         double clampedAngle;
-            if (angle >= BotState.angleUp){
-                clampedAngle = BotState.angleUp;
-            } else if (angle <= BotState.angleDown) {
-                clampedAngle = BotState.angleDown;
+            if (angle >= 75){
+                clampedAngle = 75;
+            } else if (angle <= 45) {
+                clampedAngle = 45;
             } else {
                 clampedAngle = angle;
             }
@@ -294,30 +325,30 @@ public class Methods {
     // set angle?? LIMELIGHT? nah
 
     // Update angle every loop in the runner ***SYNC THEIR SPEEDS (one is faster for some reason (only in one direction))
-    public void updateAngle(double targetPose) {
+    public void updateAngle(double targetAngle) {
         // set both to same speed
-        config.angleLeft.setPosition(targetPose); // update angle servos
-        config.angleRight.setPosition(targetPose);
+        config.angleLeft.setPosition(angleToPos(targetAngle)); // update angle servos
+        config.angleRight.setPosition(angleToPos(targetAngle));
     }
 
     // LAUNCH SERVO CONTROL
-    // drop into shooter. state machine for servos
+    // drop into flywheel. state machine for servos
     public void shoot(boolean left, boolean mid, boolean right) {
         if (left && !leftStarted) {//leftState != launchState.dropping) {
-            config.releaseLeft.setPosition(drop);
-            leftState = launchState.dropping;
+
+            leftState = servoState.going;
             leftDropTimer.reset();
             leftStarted = true;
         }
         if (mid && !midStarted) { //midState != launchState.dropping) {
             config.releaseMiddle.setPosition(drop);
-            midState = launchState.dropping;
+            midState = servoState.going;
             midDropTimer.reset();
             midStarted = true;
         }
         if (right && !rightStarted) {//rightState != launchState.dropping) {
             config.releaseRight.setPosition(drop);
-            rightState = launchState.dropping;
+            rightState = servoState.going;
             rightDropTimer.reset();
             rightStarted = true;
         }
@@ -326,84 +357,116 @@ public class Methods {
     public void flickOut(boolean flick) {
         if (flick && !flickStarted) { //midState != launchState.dropping) {
             config.releaseMiddle.setPosition(out);
-            midState = launchState.flicking;
+            midState = servoState.flicking;
             midDropTimer.reset();
             flickStarted = true;
         }
     }
 
-    // Update launcher servo states in the runner
+    // method to "scoop" - use state machine for drop servos and same logic as drop servos :)
+    public void angleScoop (boolean triggered) {
+        if (triggered && !scoopStarted) {//leftState != launchState.dropping) {
+            updateAngle(scoopAngle);
+            scoopState = servoState.going;
+            scoopTimer.reset();
+            scoopStarted = true;
+        }
+    }
+
+    // Update launcher servo states AND the scoop state in the runner
     public void updateServoState() {
 
-        if (leftState == launchState.idle) {
+        if (leftState == servoState.idle) {
             config.releaseLeft.setPosition(hold);
             leftStarted = false;
-        } else if (leftState == launchState.dropping) {
+        } else if (leftState == servoState.going) {
             config.releaseLeft.setPosition(drop);
-            if (leftDropTimer.seconds() > dropServoWait) {
-                leftState = launchState.returning;
+            if (leftDropTimer.seconds() > servoWait) {
+                leftState = servoState.returning;
                 leftDropTimer.reset();
             }
-        } else if (leftState == launchState.returning) {
+        } else if (leftState == servoState.returning) {
             config.releaseLeft.setPosition(hold);
-            if (leftDropTimer.seconds() > dropServoWait) {
-                leftState = launchState.idle;
+            if (leftDropTimer.seconds() > servoWait) {
+                leftState = servoState.idle;
             }
         }
 
-        if (midState == launchState.idle) {
+        if (midState == servoState.idle) {
             config.releaseMiddle.setPosition(hold);
             midStarted = false;
             flickStarted = false; // middle is a bit different because it can move backwards
-        } else if (midState == launchState.dropping) {
+        } else if (midState == servoState.going) {
             config.releaseMiddle.setPosition(drop);
-            if (midDropTimer.seconds() > dropServoWait) {
-                midState = launchState.returning;
+            if (midDropTimer.seconds() > servoWait) {
+                midState = servoState.returning;
                 midDropTimer.reset();
             }
-        } else if (midState == launchState.flicking) { // extra else-if for flick in the middle
+        } else if (midState == servoState.flicking) { // extra else-if for flick in the middle
             config.releaseMiddle.setPosition(out);
-            if (midDropTimer.seconds() > dropServoWait) {
-                midState = launchState.returning;
+            if (midDropTimer.seconds() > servoWait) {
+                midState = servoState.returning;
                 midDropTimer.reset();
             }
-        } else if (midState == launchState.returning) {
+        } else if (midState == servoState.returning) {
             config.releaseMiddle.setPosition(hold);
-            if (midDropTimer.seconds() > dropServoWait) {
-                midState = launchState.idle;
+            if (midDropTimer.seconds() > servoWait) {
+                midState = servoState.idle;
             }
         }
 
-        if (rightState == launchState.idle) {
+        if (rightState == servoState.idle) {
             config.releaseRight.setPosition(hold);
             rightStarted = false;
-        } else if (rightState == launchState.dropping) {
+        } else if (rightState == servoState.going) {
             config.releaseRight.setPosition(drop);
-            if (rightDropTimer.seconds() > dropServoWait) {
-                rightState = launchState.returning;
+            if (rightDropTimer.seconds() > servoWait) {
+                rightState = servoState.returning;
                 rightDropTimer.reset();
             }
-        } else if (rightState == launchState.returning) {
+        } else if (rightState == servoState.returning) {
             config.releaseRight.setPosition(hold);
-            if (rightDropTimer.seconds() > dropServoWait) {
-                rightState = launchState.idle;
+            if (rightDropTimer.seconds() > servoWait) {
+                rightState = servoState.idle;
             }
         }
 
-        shotInProgress = leftState != launchState.idle || midState != launchState.idle || rightState != launchState.idle;
+        if (scoopState == servoState.idle) { // THIS ONE IS THE SCOOP STATE
+            scoopStarted = false;
+        } else if (scoopState == servoState.going) {
+            updateAngle(scoopAngle);
+            if (scoopTimer.seconds() > servoWait) {
+                scoopState = servoState.returning;
+                scoopTimer.reset();
+            }
+        } else if (scoopState == servoState.returning) {
+            updateAngle(75);
+            if (scoopTimer.seconds() > servoWait) {
+                scoopState = servoState.idle;
+            }
+        }
+
+        armsMoving = leftState != servoState.idle || midState != servoState.idle || rightState != servoState.idle;
+        scoopMoving = scoopState != servoState.idle;
     }
 
     // servo state getters
-    public launchState getLeftState() {
+    public servoState getLeftState() {
         return leftState;
     }
-    public launchState getMidState() {
+    public servoState getMidState() {
         return midState;
     }
-    public launchState getRightState() {
+    public servoState getRightState() {
         return rightState;
     }
-    public boolean isShotInProgress() {
-        return shotInProgress;
+    public servoState getScoopState() {
+        return scoopState;
+    }
+    public boolean isArmMoving() {
+        return armsMoving;
+    }
+    public boolean isScoopMoving(){
+        return scoopMoving;
     }
 }

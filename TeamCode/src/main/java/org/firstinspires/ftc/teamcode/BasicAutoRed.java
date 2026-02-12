@@ -2,8 +2,6 @@ package org.firstinspires.ftc.teamcode;
 
 import static java.lang.Math.toRadians;
 
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
@@ -15,12 +13,8 @@ import org.firstinspires.ftc.teamcode.BotState.botState;
 import org.firstinspires.ftc.teamcode.RRProgs.MecanumDrive;
 
 import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-
-import java.util.List;
 
 // @Disabled // comment this line to show this program on drivers hub
 @Autonomous(name = "Basic Auto RED", group = "autonomous")
@@ -59,7 +53,7 @@ public class BasicAutoRed extends LinearOpMode {
 
         // INIT POSITION
         state.setBot(botState.idle);
-        state.updateBotState(false, false, false, false);
+        state.updateBotState(false, false, false, false, 0, 45);
 
         config.limelight.start();
         // Get results from the Limelight
@@ -84,9 +78,9 @@ public class BasicAutoRed extends LinearOpMode {
             Actions.runBlocking(
                     new ParallelAction(
                             new SequentialAction(
-                                    state.setBotAction(botState.slowSpeed, false, false, false, false, false),
+                                    state.setBotAction(botState.shoot, false, false, false, false, false),
                                     outToShoot.build(),
-                                    state.setBotAction(botState.slowSpeed, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
                                     state.setBotAction(botState.idle, false, false, false, false, false),
                                     offLine.build()
                             ),
