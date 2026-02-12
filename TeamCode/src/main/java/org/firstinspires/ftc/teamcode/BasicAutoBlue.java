@@ -35,16 +35,19 @@ public class BasicAutoBlue extends LinearOpMode {
         // POSITIONS
         // this is where the bot is starting, with the x, y, and rotation (heading (in radians)).
         Pose2d startPose = new Pose2d(50, 52, toRadians(-45));
-        Vector2d shootPattern = new Vector2d(36, 36);
+        Vector2d shootPattern = new Vector2d(35, 35);
         Pose2d shootPatternPose = new Pose2d(shootPattern, toRadians(45));
         Vector2d startIntakeOne = new Vector2d(20,28);
         Pose2d startIntakeOnePose = new Pose2d(startIntakeOne, toRadians(-90));
         Vector2d endIntakeOne = new Vector2d(4, 52);
         Pose2d endIntakeOnePose = new Pose2d(endIntakeOne, toRadians(-90));
-        Vector2d startIntakeTwo = new Vector2d(-4, 28);
+        Vector2d startIntakeTwo = new Vector2d(-5, 28);
         Pose2d startIntakeTwoPose = new Pose2d(startIntakeTwo, toRadians(-90));
-        Vector2d endIntakeTwo = new Vector2d(-28, 52);
+        Vector2d endIntakeTwo = new Vector2d(-21, 52);
         Pose2d endIntakeTwoPose = new Pose2d(endIntakeOne, toRadians(-90));
+
+        Vector2d endMove = new Vector2d(-4, 50);
+        Pose2d endMovePose = new Pose2d(endMove, toRadians(-90));
 
         // initialize and assign variables to the other classes with the proper arguments. !!!!! IMPORTANT (must be between positions and actions)
         config = new Configuration(hardwareMap);
@@ -54,7 +57,7 @@ public class BasicAutoBlue extends LinearOpMode {
 
         // TRAJECTORY ACTIONS !!!
         TrajectoryActionBuilder toShootOne = drive.actionBuilder(startPose)
-                .strafeToSplineHeading(shootPattern, toRadians(45)); // move from start to shoot position
+                .strafeToSplineHeading(shootPattern, toRadians(45)); // move from start to shoot position (tangent is weird)
         TrajectoryActionBuilder toIntakeOne = drive.actionBuilder(shootPatternPose)
                 .strafeToSplineHeading(startIntakeOne, toRadians(-90)) // move to prepare for intake
                 .strafeToConstantHeading(endIntakeOne, new TranslationalVelConstraint(15)); // intake!
@@ -65,6 +68,9 @@ public class BasicAutoBlue extends LinearOpMode {
                 .strafeToConstantHeading(endIntakeTwo, new TranslationalVelConstraint(15)); // intake again!
         TrajectoryActionBuilder toShootThree = drive.actionBuilder(endIntakeTwoPose)
                 .splineTo(shootPattern, toRadians(45)); // go to shoot again again!
+
+        TrajectoryActionBuilder toEndMove = drive.actionBuilder(shootPatternPose)
+                .splineToLinearHeading(endMovePose, toRadians(45)); // tangents are weird
 
         // INIT POSITION
         state.setBot(botState.idle);
@@ -113,15 +119,25 @@ public class BasicAutoBlue extends LinearOpMode {
                                     state.setBotAction(botState.shoot, true, false, false, false, false),
                                     state.setBotAction(botState.intake, false, false, false, false, false),
                                     toIntakeOne.build(),
-                                    // state.setBotAction(botState.intake, false, true, false, false, false), // flick
+                                    // state.setBotAction(botState.intake, false, true, false, false, false), // flick (we don't need to flick)
                                     new ParallelAction(
                                         state.setBotAction(botState.intake, false, false, true, false, false), // scoop
                                         toShootTwo.build()),
                                     state.setBotAction(botState.shoot, true, false, false, false, false),
                                     state.setBotAction(botState.shoot, true, false, false, false, false),
                                     state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.intake, false, false, false, false, false),
+                                    toIntakeTwo.build(),
+                                    // state.setBotAction(botState.intake, false, true, false, false, false), // flick (we don't need to flick
+                                    new ParallelAction(
+                                            state.setBotAction(botState.intake, false, false, true, false, false), // scoop
+                                            toShootThree.build()),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+
                                     state.setBotAction(botState.idle, false, false, false, false, false),
-                                    toIntakeTwo.build()
+                                    toEndMove.build()
                             ),
                             state.updateStateAction()
                     )

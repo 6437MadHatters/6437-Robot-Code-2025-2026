@@ -139,7 +139,7 @@ public class BotState {
                     rrRightB = shootRight;
                     rrLeftX  = shootLeft;
                     rrMiddleY = shootMid;
-                    rrRPM = 2050;
+                    rrRPM = 2075;
                     rrAngle = 65;
                 } else {
                     rrAllA = allA;
