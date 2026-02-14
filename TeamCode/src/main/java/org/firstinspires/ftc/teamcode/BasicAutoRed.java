@@ -6,6 +6,7 @@ import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
+import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
 
@@ -32,40 +33,67 @@ public class BasicAutoRed extends LinearOpMode {
         telemetry.update();
 
         // POSITIONS
-        // this is where the bot is starting, with the x, y, and rotation (heading (in radians(3189 put tape on the field labeling this))).
-        Pose2d startPose = new Pose2d(56, -56, toRadians(35));
-        Vector2d shootThree = new Vector2d(26, -26);
-        Pose2d shootThreePose = new Pose2d(shootThree, toRadians(-60));
-        Vector2d moveOut = new Vector2d(10,-24);
-        Pose2d moveOutPose = new Pose2d(moveOut, toRadians(-60));
+        // this is where the bot is starting, with the x, y, and rotation (heading (in radians)).
+        Pose2d startPose = new Pose2d(50, -52, toRadians(45));
+        Vector2d shootPattern = new Vector2d(34, -34);
+        Pose2d shootPatternPose = new Pose2d(shootPattern, toRadians(-45));
+        Vector2d startIntakeOne = new Vector2d(20,-28);
+        Pose2d startIntakeOnePose = new Pose2d(startIntakeOne, toRadians(90));
+        Vector2d endIntakeOne = new Vector2d(5, -52);
+        Pose2d endIntakeOnePose = new Pose2d(endIntakeOne, toRadians(90));
+        Vector2d startIntakeTwo = new Vector2d(-5, -28);
+        Pose2d startIntakeTwoPose = new Pose2d(startIntakeTwo, toRadians(90));
+        Vector2d endIntakeTwo = new Vector2d(-20, -52);
+        Pose2d endIntakeTwoPose = new Pose2d(endIntakeTwo, toRadians(90));
 
-        // initialize and assign variables to the other classes with the proper arguments. !!!!! IMPORTANT
+        Vector2d endMove = new Vector2d(44, -24);
+        Pose2d endMovePose = new Pose2d(endMove, toRadians(90));
+
+        // initialize and assign variables to the other classes with the proper arguments. !!!!! IMPORTANT (must be between positions and actions)
         config = new Configuration(hardwareMap);
         drive = new MecanumDrive(hardwareMap, startPose); // initialize RR drive with start position
         method = new Methods(config);
         state = new BotState(config, method, telemetry);
 
         // TRAJECTORY ACTIONS !!!
-        TrajectoryActionBuilder outToShoot = drive.actionBuilder(startPose)
-                .strafeToLinearHeading(shootThree, toRadians(-60)); // move from start to shoot
-        TrajectoryActionBuilder offLine = drive.actionBuilder(shootThreePose)
-                .strafeToConstantHeading(moveOut); // move off the line
+        TrajectoryActionBuilder toShootOne = drive.actionBuilder(startPose)
+                .strafeToSplineHeading(shootPattern, toRadians(-45)); // move from start to shoot position (tangent is weird)
+        TrajectoryActionBuilder toIntakeOne = drive.actionBuilder(shootPatternPose)
+                .strafeToSplineHeading(startIntakeOne, toRadians(90)) // move to prepare for intake
+                .strafeToConstantHeading(endIntakeOne, new TranslationalVelConstraint(15)); // intake!
+        TrajectoryActionBuilder toShootTwo = drive.actionBuilder(endIntakeOnePose)
+                .splineTo(shootPattern, toRadians(-45)); // go to shoot again
+        TrajectoryActionBuilder toIntakeTwo = drive.actionBuilder(shootPatternPose)
+                .strafeToSplineHeading(startIntakeTwo, toRadians(90)) // move to prepare for intake again
+                .strafeToConstantHeading(endIntakeTwo, new TranslationalVelConstraint(15)); // intake again!
+        TrajectoryActionBuilder toShootThree = drive.actionBuilder(endIntakeTwoPose)
+                .splineTo(shootPattern, toRadians(-45)); // go to shoot again again!
+
+        TrajectoryActionBuilder toEndMove = drive.actionBuilder(shootPatternPose)
+                .strafeToConstantHeading(endMove);
+
 
         // INIT POSITION
         state.setBot(botState.idle);
         state.updateBotState(false, false, false, false, 0, 45);
+
+        // SCAN APRIL TAG
+        // april tag pipeline. you can change these in the limelight manager.
+        config.limelight.pipelineSwitch(1); // 0 for blue, 1 for red
 
         config.limelight.start();
         // Get results from the Limelight
         while (opModeInInit()) {
             telemetry.addLine("Init done. Finding April Tag.");
             LLResult result = config.limelight.getLatestResult();
+            int lastTagID = 0;
             if (result != null && result.isValid()){
-                int lastTagID = result.getFiducialResults().get(0).getFiducialId(); // THIS IS THE TARGET ID!!!!!!!!!!!!!
+                lastTagID = result.getFiducialResults().get(0).getFiducialId(); // THIS IS THE TARGET ID!!!!!!!!!!!!!
                 telemetry.addData("Detected Tag ID", lastTagID);
             } else {
                 telemetry.addData("Limelight", "No targets seen");
             }
+            method.updatePattern(lastTagID);
             telemetry.update();
         }
 
@@ -74,15 +102,43 @@ public class BasicAutoRed extends LinearOpMode {
         waitForStart();
         while (opModeIsActive() && running) {
 
+            // KEY FOR BOOLEANS
+            // usePattern = only for pattern when shooting
+            // allA = shoot all or flick
+            // rightB = shoot right or scoop
+            // leftX = shoot left
+            // middleY = shoot middle
+
             // follow trajectory
             Actions.runBlocking(
                     new ParallelAction(
                             new SequentialAction(
                                     state.setBotAction(botState.shoot, false, false, false, false, false),
-                                    outToShoot.build(),
+                                    toShootOne.build(),
+                                    state.setBotAction(botState.shoot, true, false,false, false, false), // shoot three times
                                     state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.intake, false, false, false, false, false),
+                                    toIntakeOne.build(),
+                                    // state.setBotAction(botState.intake, false, true, false, false, false), // flick (we don't need to flick)
+                                    new ParallelAction(
+                                            state.setBotAction(botState.intake, false, false, true, false, false), // scoop
+                                            toShootTwo.build()),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.intake, false, false, false, false, false),
+                                    toIntakeTwo.build(),
+                                    // state.setBotAction(botState.intake, false, true, false, false, false), // flick (we don't need to flick
+                                    new ParallelAction(
+                                            state.setBotAction(botState.intake, false, false, true, false, false), // scoop
+                                            toShootThree.build()),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+
                                     state.setBotAction(botState.idle, false, false, false, false, false),
-                                    offLine.build()
+                                    toEndMove.build()
                             ),
                             state.updateStateAction()
                     )

@@ -94,7 +94,7 @@ public class Methods {
     double out = .14;
     double hold = .29;
     double drop = .44;
-    int scoopAngle = 45;
+    int scoopAngle = 50;
     double servoWait = .5;
 
     // ACTUAL METHODS
@@ -365,7 +365,7 @@ public class Methods {
 
     // method to "scoop" - use state machine for drop servos and same logic as drop servos :)
     public void angleScoop (boolean triggered) {
-        if (triggered && !scoopStarted) {//leftState != launchState.dropping) {
+        if (triggered && !scoopStarted) { //leftState != launchState.dropping) {
             updateAngle(scoopAngle);
             scoopState = servoState.going;
             scoopTimer.reset();
