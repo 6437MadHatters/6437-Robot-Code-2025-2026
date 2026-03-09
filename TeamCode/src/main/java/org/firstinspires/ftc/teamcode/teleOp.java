@@ -214,8 +214,10 @@ public class teleOp extends LinearOpMode {
 
              // Lift
             if (gamepad1Dpad_Up.buttonPress()) {
-                config.liftMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-                config.liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                if (config.liftMotor.getCurrentPosition() < method.topTicks) {
+                    config.liftMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+                    config.liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                }
                 state.setBot(botState.idle);
                 goUp = true;
             }

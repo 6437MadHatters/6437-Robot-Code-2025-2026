@@ -24,10 +24,9 @@ public class Methods {
     // VARIABLES
 
     // LIFT VARIABLES
-    int topTicks = 675;
+    int topTicks = 675; // this is the top of the lift
     double liftUpPower = 1;
-    double liftHoldPower = 0.15;
-    double sinkDownPower = 0.25;
+    double liftHoldPower = .1;
 
     // INTAKE VARIABLES
     ColorSensor colorSensor;
@@ -94,16 +93,15 @@ public class Methods {
     double out = .14;
     double hold = .29;
     double drop = .44;
-    int scoopAngle = 50;
+    int scoopAngle = 55; // how high scoop method goes up; it was 45 :)
     double servoWait = .5;
 
     // ACTUAL METHODS
 
     // LIFT CONTROL
     public void updateLift(boolean goUp) {
-        int current = config.liftMotor.getCurrentPosition();
         if (goUp) {
-            if (current < topTicks) {
+            if (config.liftMotor.getCurrentPosition() < topTicks) {
                 config.liftMotor.setPower(liftUpPower); // power until the arm is past physically perpendicular with floor
             } else {
                 config.liftMotor.setPower(liftHoldPower); // passed the middle, sink down to mechanical hard stop

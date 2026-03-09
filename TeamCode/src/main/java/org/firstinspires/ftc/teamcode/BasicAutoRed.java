@@ -37,17 +37,17 @@ public class BasicAutoRed extends LinearOpMode {
         Pose2d startPose = new Pose2d(50, -52, toRadians(45));
         Vector2d shootPattern = new Vector2d(34, -34);
         Pose2d shootPatternPose = new Pose2d(shootPattern, toRadians(-45));
-        Vector2d startIntakeOne = new Vector2d(20,-28);
+        Vector2d startIntakeOne = new Vector2d(19,-28);
         Pose2d startIntakeOnePose = new Pose2d(startIntakeOne, toRadians(90));
-        Vector2d endIntakeOne = new Vector2d(5, -52);
+        Vector2d endIntakeOne = new Vector2d(2, -52);
         Pose2d endIntakeOnePose = new Pose2d(endIntakeOne, toRadians(90));
-        Vector2d startIntakeTwo = new Vector2d(-5, -28);
+        Vector2d startIntakeTwo = new Vector2d(-4, -28);
         Pose2d startIntakeTwoPose = new Pose2d(startIntakeTwo, toRadians(90));
-        Vector2d endIntakeTwo = new Vector2d(-20, -52);
+        Vector2d endIntakeTwo = new Vector2d(-21, -52);
         Pose2d endIntakeTwoPose = new Pose2d(endIntakeTwo, toRadians(90));
 
         Vector2d endMove = new Vector2d(44, -24);
-        Pose2d endMovePose = new Pose2d(endMove, toRadians(90));
+        Pose2d endMovePose = new Pose2d(endMove, toRadians(-45));
 
         // initialize and assign variables to the other classes with the proper arguments. !!!!! IMPORTANT (must be between positions and actions)
         config = new Configuration(hardwareMap);
