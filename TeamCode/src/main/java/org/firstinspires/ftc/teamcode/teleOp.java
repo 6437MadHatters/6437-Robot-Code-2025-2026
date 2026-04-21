@@ -53,14 +53,16 @@ public class teleOp extends LinearOpMode {
 
     // I HATE THIS
     enum shootMode {
-        far,
-        close,
+        three,
+        one,
         none
     }
     shootMode currentShootMode = shootMode.none;
 
-    int rpm = 0;
-    double angle = 60;
+    int rpm = 0; // starting rpm
+    double leftStick = 0; // variable to change heading and keep the april tag centered when firing
+    double angle = 60; // starting angle
+    double initAngle = 45; // initial angle for auto align (make sure we can see the april tag)
 
     // class variables.
     Configuration config;
@@ -123,7 +125,9 @@ public class teleOp extends LinearOpMode {
         method.updateLift(goUp);
 
         state.setBot(botState.idle);
-        state.updateBotState(false, false, false, false, rpm, angle);
+        state.updateBotState(false, false, false, false, false, rpm, angle);
+
+        config.limelight.start(); // start the limelight
 
         // tell when init is done
         telemetry.addLine("init done");
@@ -168,12 +172,10 @@ public class teleOp extends LinearOpMode {
             // BOT STATE MACHINE (change states!!!)
             // shoot close mode
             if (triggerTap(gamepad1.right_trigger)) {
-                if (currentShootMode != shootMode.close) {
+                if (currentShootMode != shootMode.one) {
                     state.setBot(botState.shoot);
                     lastState = botState.shoot;
-                    rpm = 2500;
-                    angle = 60;
-                    currentShootMode = shootMode.close;
+                    currentShootMode = shootMode.one;
                 } else {
                     state.setBot(botState.idle);
                     lastState = botState.idle;
@@ -182,12 +184,10 @@ public class teleOp extends LinearOpMode {
 
             // shoot far mode
             if (gamepad1_Right_bumper.buttonPress()) {
-                if (currentShootMode != shootMode.far) {
+                if (currentShootMode != shootMode.three) {
                     state.setBot(botState.shoot);
                     lastState = botState.shoot;
-                    rpm = 3200;
-                    angle = 50;
-                    currentShootMode = shootMode.far;
+                    currentShootMode = shootMode.three;
                 } else {
                     state.setBot(botState.idle);
                     lastState = botState.idle;
@@ -213,7 +213,7 @@ public class teleOp extends LinearOpMode {
              }
 
              // Lift
-            if (gamepad1Dpad_Up.buttonPress()) {
+            if (gamepad1Dpad_Up.buttonPress() && config.liftMotor.getCurrentPosition() < 250) {
                 if (config.liftMotor.getCurrentPosition() < method.topTicks) {
                     config.liftMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
                     config.liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -223,12 +223,30 @@ public class teleOp extends LinearOpMode {
             }
             method.updateLift(goUp);
 
+            // AUTO ALIGN
+            method.getLLDistances(telemetry); // get limelight info for auto alignment
+            if (state.getBotState() == botState.shoot){
+                if (currentShootMode == shootMode.three) {
+                    rpm = method.alignRPM(true, telemetry);
+                    angle = method.alignShooterAngle(angle, true, telemetry); // sets angle to initial value/last value and adjusts
+                } else if (currentShootMode == shootMode.one) {
+                    rpm = method.alignRPM(false, telemetry);
+                    angle = method.alignShooterAngle(angle, false, telemetry); // sets angle to initial value/last value and adjusts
+                }
+                leftStick = method.autoLeftStickAlign(gamepad1.left_stick_x, telemetry); // AUTOMATIC LEFT STICK VALUE TO STAY ALIGNED WITH APRIL TAG - this needs the actual left stick input in case it loses track of the april tag
+            } else {
+                rpm = 0;
+                leftStick = gamepad1.left_stick_x; // IMPORTANT - manual control if we aren't shooting
+                angle = initAngle;
+            }
+
             // UPDATE BOT STATE EVERY ITERATION OF THE LOOP (arguments are for buttons that are used in updateBotState)
             state.updateBotState(
                     (gamepad1A.buttonPress()),
                     (gamepad1B.buttonPress()),
                     (gamepad1X.buttonPress()),
                     (gamepad1Y.buttonPress()),
+                    false,
                     rpm,
                     angle
             );
@@ -238,8 +256,8 @@ public class teleOp extends LinearOpMode {
             }
 
             telemetry.addData("Current State", state.getBotState());
-            telemetry.addData("lift position", config.liftMotor.getCurrentPosition());
-            telemetry.addData("lift power", config.liftMotor.getPower());
+            //telemetry.addData("lift position", config.liftMotor.getCurrentPosition());
+            //telemetry.addData("lift power", config.liftMotor.getPower());
 
 
             // DRIVE !!! \/
@@ -251,13 +269,13 @@ public class teleOp extends LinearOpMode {
             telemetry.addData("Headless Mode", headlessMode);
 
             // SPEED
-            double turnMultiplier = .85;
+            double turnMultiplier = .9;
 
             // telemetry.addData("turn multiplier (drive speed): ", turnMultiplier);
 
             //drive code, I don't really understand much.
             if (headlessMode) {
-                driveTurn = -gamepad1.left_stick_x;
+                driveTurn = -leftStick; // leftStick is gamepad1.left_stick_x
                 driveHorizontal = gamepad1.right_stick_x;
                 driveVertical = -gamepad1.right_stick_y;
 
@@ -313,18 +331,17 @@ public class teleOp extends LinearOpMode {
 
                 //drive math
                 double strafeSpeed = 1.5;
-                driveTurn *= .7;
-                // yaw speed
+                driveTurn *= .7; // yaw speed
                 config.frontRight.setPower((-driveVertical + (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
                 config.backRight.setPower((-driveVertical - (driveHorizontal * strafeSpeed) + driveTurn) * turnMultiplier);
                 config.frontLeft.setPower((-driveVertical - (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
                 config.backLeft.setPower((-driveVertical + (driveHorizontal * strafeSpeed) - driveTurn) * turnMultiplier);
             } else {
-                //basic mecanum code (MAKE STICK INPUTS NEGATIVE TO CHANGE ROBOT DIRECTION (RIGHT STICK ONLY!!!!)) !!!!!!!!!!!!!!!!
-                config.frontLeft.setPower((-gamepad1.right_stick_y + (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
-                config.backLeft.setPower((-gamepad1.right_stick_y - (gamepad1.right_stick_x) + gamepad1.left_stick_x) * turnMultiplier);
-                config.frontRight.setPower((-gamepad1.right_stick_y - (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
-                config.backRight.setPower((-gamepad1.right_stick_y + (gamepad1.right_stick_x) - gamepad1.left_stick_x) * turnMultiplier);
+                //basic mecanum code (MAKE STICK INPUTS NEGATIVE TO CHANGE ROBOT DIRECTION (RIGHT STICK ONLY!!!!)) !!!!!!!!!!!!!!!! // leftStick is gamepad1.left_stick_x
+                config.frontLeft.setPower((-gamepad1.right_stick_y + (gamepad1.right_stick_x) + leftStick) * turnMultiplier); // leftStick is gamepad1.left_stick_x
+                config.backLeft.setPower((-gamepad1.right_stick_y - (gamepad1.right_stick_x) + leftStick) * turnMultiplier); // leftStick is gamepad1.left_stick_x
+                config.frontRight.setPower((-gamepad1.right_stick_y - (gamepad1.right_stick_x) - leftStick) * turnMultiplier); // leftStick is gamepad1.left_stick_x
+                config.backRight.setPower((-gamepad1.right_stick_y + (gamepad1.right_stick_x) - leftStick) * turnMultiplier); // leftStick is gamepad1.left_stick_x
             }
 
             // Show the elapsed game time and wheel power.

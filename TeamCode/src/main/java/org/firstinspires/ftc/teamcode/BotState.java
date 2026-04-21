@@ -40,12 +40,14 @@ public class BotState {
 
     // Action variables (USE THESE IN AUTO)
     botState rrSetState = botState.idle;
-    boolean rrAllA = false;
-    boolean rrLeftX = false;
-    boolean rrRightB = false;
-    boolean rrMiddleY = false;
-    int rrRPM = 0;
-    double rrAngle = 60;
+    boolean rrAllOrFlick = false;
+    boolean rrLeft = false;
+    boolean rrRight = false;
+    boolean rrMiddle = false;
+    boolean rrScoop = false;
+    int rrRPM = 0; // initial auo rpm
+    double rrAngle = 60; // starting auto angle
+    double initRRAngle = 45; // initial angle for auto-align in auto (make sure we can see the april tag)
 
     // BOT STATE MACHINE
     // change state
@@ -54,7 +56,7 @@ public class BotState {
     }
 
     // update states every iteration of the loop IN THE RUNNER
-    public void updateBotState(boolean allA, boolean rightB, boolean leftX, boolean middleY, int rpm, double angle) {
+    public void updateBotState(boolean allA, boolean rightB, boolean leftX, boolean middleY, boolean scoop, int rpm, double angle) {
 
         if (currentState == botState.idle) {
             method.intakePower(0);
@@ -65,12 +67,13 @@ public class BotState {
             method.shooterPower(0);
             currentAngle = 75; // needs to be all the way up when intaking
             method.flickOut(allA); // flick if allA is "pressed"
-            method.angleScoop(rightB); // "scoop" if rightB is "pressed"
+            method.angleScoop(scoop); // "scoop" if "pressed"
 
         } else if (currentState == botState.eject) {
-            method.intakePower(-.5);
+            method.intakePower(-.6);
             method.shooterPower(0);
             currentAngle = 75; // and ejecting I guess
+
         } else if (currentState == botState.shoot && rpm != 0) {
             method.intakePower(0);
             readyToShoot = method.setRPM(rpm, telemetry);
@@ -90,21 +93,23 @@ public class BotState {
             }
         }
 
+        if (currentState != botState.shoot){
+            method.pidErrorReset();
+        }
+
         // updates
-        method.updateAngle(currentAngle); // calls two methods: one to convert angle to pose, another to set servo pose
+        method.updateAngle(currentAngle); // set the angle servos to a position
         method.updateServoState(); // CHANGES DROPDONE
         lastState = currentState;
 
 
         // telemetry
         telemetry.addData("angle pose", currentAngle);
-        telemetry.addData("middle drop state", method.getMidState());
-        telemetry.addData("right drop state", method.getRightState());
-        telemetry.addData("left drop state", method.getLeftState());
-        telemetry.addData("scoop state", method.getScoopState());
-        telemetry.addData("left color", method.getBallColor("left"));
-        telemetry.addData("middle color", method.getBallColor("mid"));
-        telemetry.addData("right color", method.getBallColor("right"));
+        //telemetry.addData("middle drop state", method.getMidState());
+        //telemetry.addData("right drop state", method.getRightState());
+        //telemetry.addData("left drop state", method.getLeftState());
+        //telemetry.addData("scoop state", method.getScoopState());
+        telemetry.addData("Detected colors (left, mid, right)", method.getBallColor(config.colorLeft, config.rangeLeft) + ", " + method.getBallColor(config.colorMid, config.rangeMid) + ", " + method.getBallColor(config.colorRight, config.rangeRight));
         // telemetry.addData("dist", method.getSensedDist()); // distance test
         // telemetry.addData("hue", method.getHue()); // hue test
     }
@@ -115,7 +120,7 @@ public class BotState {
     }
 
     // RR ACTION TO CHANGE STATE INSTANTANEOUSLY (until a drop completes (or doesn't even start))
-    public Action setBotAction (botState state, boolean usePattern, boolean allA, boolean rightB, boolean leftX, boolean middleY) {
+    public Action setBotAction (botState state, boolean usePattern, boolean allOrflick, boolean scoop, int rpm, int angle) {
         return new Action() {
             boolean moveStarted = false; // boolean to check if servo fsm has started
             boolean latched = false; // latch shots if using pattern
@@ -125,35 +130,33 @@ public class BotState {
 
                 rrSetState = state;
 
-                boolean needsToAct = usePattern || allA || rightB || leftX || middleY; // check if we even requested to move
+                boolean needsToAct = usePattern || allOrflick || scoop; // check if we even requested to move something
 
                 // define rrVariables based on argument
                 if (usePattern) {
                     if (!latched) { // latch pattern shots so only one can go at a time
-                        shootRight = method.shouldShoot("right");
-                        shootLeft  = method.shouldShoot("left");
-                        shootMid   = method.shouldShoot("mid");
+
+                        shootRight = method.shouldShoot(config.colorRight, config.rangeRight);
+                        shootLeft  = method.shouldShoot(config.colorLeft, config.rangeLeft);
+                        shootMid   = method.shouldShoot(config.colorMid, config.rangeMid);
                         latched = true;
                     }
-                    rrAllA = false;
-                    rrRightB = shootRight;
-                    rrLeftX  = shootLeft;
-                    rrMiddleY = shootMid;
-                    rrRPM = 2060;
-                    rrAngle = 65;
+                    rrAllOrFlick = false;
+                    rrRight = shootRight;
+                    rrLeft = shootLeft;
+                    rrMiddle = shootMid;
+
                 } else {
-                    rrAllA = allA;
-                    rrRightB = rightB;
-                    rrLeftX = leftX;
-                    rrMiddleY = middleY;
-                    rrRPM = 2500;
-                    rrAngle = 65;
+                    rrAllOrFlick = allOrflick;
+                    rrScoop = scoop;
                 }
+                rrRPM = rpm;
+                rrAngle = angle;
 
                 // SHOOT STATE
                 if (state == botState.shoot) {
 
-                    if (!needsToAct || (!rrAllA && !rrRightB && !rrLeftX && !rrMiddleY)) {
+                    if (!needsToAct || (!rrAllOrFlick && !rrRight && !rrLeft && !rrMiddle)) {
                         return false; // stop if there's nothing to shoot
                     }
 
@@ -167,7 +170,7 @@ public class BotState {
                     }
 
                     if (moveStarted && !method.isArmMoving()) {
-                        rrAllA = rrRightB = rrLeftX = rrMiddleY = false; // shot finished
+                        rrAllOrFlick = rrScoop = rrRight = rrLeft = rrMiddle = false; // shot finished
                         method.rearrangePattern();
                         return false;
                     }
@@ -178,10 +181,7 @@ public class BotState {
                 // INTAKE STATE
                 if (state == botState.intake) {
 
-                    // allA = flick
-                    // rightB = scoop
-
-                    if (!needsToAct || (!rrAllA && !rrRightB)) {
+                    if (!needsToAct || (!rrAllOrFlick && !rrScoop)) {
                         return false; // no move requested
                     }
 
@@ -195,7 +195,7 @@ public class BotState {
                     }
 
                     if (!method.isArmMoving() && !method.isScoopMoving()) {
-                        rrAllA = rrRightB = rrLeftX = rrMiddleY = false; // movement finished
+                        rrAllOrFlick = rrScoop = false; // movement finished
                         return false;
                     }
 
@@ -216,7 +216,7 @@ public class BotState {
                 if (currentState != rrSetState) {
                     setBot(rrSetState); // call setBot and set the bot state once when the action is called
                 }
-                updateBotState(rrAllA, rrRightB, rrLeftX, rrMiddleY, rrRPM, rrAngle); // call updateBotState every loop to keep PID running and shoot artifacts
+                updateBotState(rrAllOrFlick, rrRight, rrLeft, rrMiddle, rrScoop, rrRPM, rrAngle); // call updateBotState every loop to keep PID running and shoot artifacts
                 return true;
             }
         };

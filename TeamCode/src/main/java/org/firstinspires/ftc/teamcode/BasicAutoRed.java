@@ -13,7 +13,6 @@ import com.acmerobotics.roadrunner.ftc.Actions;
 import org.firstinspires.ftc.teamcode.BotState.botState;
 import org.firstinspires.ftc.teamcode.RRProgs.MecanumDrive;
 
-import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
@@ -75,7 +74,7 @@ public class BasicAutoRed extends LinearOpMode {
 
         // INIT POSITION
         state.setBot(botState.idle);
-        state.updateBotState(false, false, false, false, 0, 45);
+        state.updateBotState(false, false, false, false, false, 0, 45);
 
         // SCAN APRIL TAG
         // april tag pipeline. you can change these in the limelight manager.
@@ -85,15 +84,7 @@ public class BasicAutoRed extends LinearOpMode {
         // Get results from the Limelight
         while (opModeInInit()) {
             telemetry.addLine("Init done. Finding April Tag.");
-            LLResult result = config.limelight.getLatestResult();
-            int lastTagID = 0;
-            if (result != null && result.isValid()){
-                lastTagID = result.getFiducialResults().get(0).getFiducialId(); // THIS IS THE TARGET ID!!!!!!!!!!!!!
-                telemetry.addData("Detected Tag ID", lastTagID);
-            } else {
-                telemetry.addData("Limelight", "No targets seen");
-            }
-            method.updatePattern(lastTagID);
+            method.readTagIDs(telemetry);
             telemetry.update();
         }
 
@@ -113,31 +104,30 @@ public class BasicAutoRed extends LinearOpMode {
             Actions.runBlocking(
                     new ParallelAction(
                             new SequentialAction(
-                                    state.setBotAction(botState.shoot, false, false, false, false, false),
+                                    state.setBotAction(botState.shoot, false, false, false, 2600, 70), // spin up when bot starts
                                     toShootOne.build(),
-                                    state.setBotAction(botState.shoot, true, false,false, false, false), // shoot three times
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.intake, false, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false,false, 2600, 70), // shoot three times
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.intake, false, false, false, 2600, 0),
                                     toIntakeOne.build(),
-                                    // state.setBotAction(botState.intake, false, true, false, false, false), // flick (we don't need to flick)
                                     new ParallelAction(
-                                            state.setBotAction(botState.intake, false, false, true, false, false), // scoop
+                                            state.setBotAction(botState.intake, false, false, true, 0, 0), // scoop
                                             toShootTwo.build()),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.intake, false, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.intake, false, false, false, 2600, 0),
                                     toIntakeTwo.build(),
                                     // state.setBotAction(botState.intake, false, true, false, false, false), // flick (we don't need to flick
                                     new ParallelAction(
-                                            state.setBotAction(botState.intake, false, false, true, false, false), // scoop
+                                            state.setBotAction(botState.intake, false, false, true, 0, 0), // scoop
                                             toShootThree.build()),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
-                                    state.setBotAction(botState.shoot, true, false, false, false, false),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
+                                    state.setBotAction(botState.shoot, true, false, false, 2600, 70),
 
-                                    state.setBotAction(botState.idle, false, false, false, false, false),
+                                    state.setBotAction(botState.idle, false, false, false, 0, 0),
                                     toEndMove.build()
                             ),
                             state.updateStateAction()

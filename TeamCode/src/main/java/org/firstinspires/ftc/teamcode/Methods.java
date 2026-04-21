@@ -4,12 +4,16 @@ import static java.lang.Thread.sleep;
 
 import android.graphics.Color;
 
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+
+import java.util.Arrays;
 
 public class Methods {
 
@@ -32,23 +36,31 @@ public class Methods {
     ColorSensor colorSensor;
     DistanceSensor rangeSensor;
     double sensedDist = 0;
+    enum alliance {
+        blue,
+        red,
+        unknown
+    }
+    alliance currentAlliance = alliance.blue;
+    int allianceID = 0;
     enum ballColor {
         green,
         purple,
         unknown,
         empty
     }
-    ballColor currentColor = ballColor.empty;
+    int patternID = 0;
     ballColor[] currentPattern = {ballColor.unknown, ballColor.unknown, ballColor.unknown};
+    ballColor currentColor = ballColor.empty;
 
     // SHOOTER FLYWHEEL VARIABLES
-    private final ElapsedTime pidTimer = new ElapsedTime(); // timer for motor PID
+    private final ElapsedTime pidTimer = new ElapsedTime(); // timer for ALL PID's
 
-    // PID coefficients - TUNE THESE (watch a youtube tutorial or something)
-    double kP = 0.025; // P
-    double kI = 0.00015; // I
-    double kD = 0.0001; // D
-    double F = 0.00027; // feedforward coefficient! slope of best fit line - helps set to more than one speed
+    // PID coefficients - TUNE THESE (watch a youtube tutorial or something) (this one is a complicated PID)
+    double kP = 0.005; // P
+    double kI = 0.000005; // I
+    double kD = 0.000075; // D
+    double F = 0.00025; // feedforward! slope of best fit of power vs rpm - helps set to more than one speed - set slightly lower than true (.00027)
     double FFOffset = 0.113; // offset of the best-fit line of motor power to rpm
     double integral = 0;
     double lastError = 0;
@@ -62,8 +74,19 @@ public class Methods {
     int avgError = 0;
     int targetRPM = 0; // separate variable to get targetRPM in other classes
 
-    // ANGLE CHANGE VARIABLES
-    // ?
+    // AUTO ALIGN VARIABLES
+    double currentDepotTag;
+    double currentTagArea = 0;
+    double currentX = 0;
+    double targetX = 0; // where do we want the center of the april tag
+    double currentXAngle = 0;
+    double finalTargetX = 0; // target after adjustment for X angle
+    double Px = 0.025; // P variable for heading P controller. tune this
+    double maxSpeedX = 1; // max speed of auto heading adjust
+    double currentY = 0;
+    double targetY = -9.5; // where do we want the center of the april tag
+    double Py = 0.15; // P variable for angle P controller. tune this
+    double maxSpeedY = 1.5; // max speed of auto angle adjust
 
     // LAUNCH SERVO VARIABLES
     private final ElapsedTime leftDropTimer = new ElapsedTime(); // timers for servo state machines
@@ -91,12 +114,17 @@ public class Methods {
     boolean scoopStarted = false;
     boolean scoopMoving = false;
     double out = .14;
-    double hold = .29;
-    double drop = .44;
+    double hold = .26;
+    double drop = .43;
     int scoopAngle = 55; // how high scoop method goes up; it was 45 :)
     double servoWait = .5;
 
     // ACTUAL METHODS
+
+    // reset all PID errors
+    public void pidErrorReset() {
+        integral = 0;
+    } // reset the total errors for all the PID's when the system closes. CALL THIS EVERY TIME YOU EXIT THE SHOOT CLASS
 
     // LIFT CONTROL
     public void updateLift(boolean goUp) {
@@ -118,67 +146,42 @@ public class Methods {
         config.intakeMotor.setPower(motorPower);
     }
 
-    // determine if a shooter has a ball (call it every single loop somewhere)
-    public ballColor getBallColor(String whichShooter){
-
-        // establish which shooter we're looking at based on argument
-        if (whichShooter.equals("left")) {
-            colorSensor = config.colorLeft;
-            rangeSensor = config.rangeLeft;
-        } else if (whichShooter.equals("mid")) {
-            colorSensor = config.colorMid;
-            rangeSensor = config.rangeMid;
-        } else if (whichShooter.equals("right")) {
-            colorSensor = config.colorRight;
-            rangeSensor = config.rangeRight;
-        }
-        // set up distance and color variables
-        sensedDist = rangeSensor.getDistance(DistanceUnit.CM);
-        int r = colorSensor.red();
-        int g = colorSensor.green();
-        int b = colorSensor.blue();
-        float[] hsvValues = {0F, 0F, 0F}; // idk why we're making a float list. apparently it makes the color sensor more accurate somehow
-        Color.RGBToHSV(r, g, b, hsvValues);
-        float hue = hsvValues[0];
-
-        if (sensedDist > 5) {
-            currentColor = ballColor.empty;
+    // PATTERN IDENTIFICATION
+    // read the april tag ID for randomization
+    public void readTagIDs(Telemetry telemetry){
+        LLResult result = config.limelight.getLatestResult();
+        if (result != null && result.isValid()){
+                for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
+                    int id = (int) tag.getFiducialId();
+                    if (id == 21 || id == 22 || id == 23) {
+                        patternID = id;
+                    } else if (id == 20 || id == 24) {
+                        allianceID = id;
+                    }
+                }
+                telemetry.addData("Detected Alliance", currentAlliance.toString() + " | " + allianceID);
+                telemetry.addData("Detected Pattern", Arrays.toString(currentPattern) + " | " + patternID);
         } else {
-            if (hue >= 110 && hue <= 160) {
-                currentColor = ballColor.green;
-            } else if (hue >= 160 && hue <= 250) {
-                currentColor = ballColor.purple;
-            } else {
-                currentColor = ballColor.unknown;
-            }
+            telemetry.addData("Limelight", "No targets seen");
         }
-
-        return currentColor;
+        updateAlliance(allianceID);
+        updatePattern(patternID);
     }
 
-    /* sensor tests
-    // test distance
-    public double getSensedDist() {
-        DistanceSensor rangeTest = config.rangeRight; // change this to test different shooters
-        return rangeTest.getDistance(DistanceUnit.CM);
+    // get april tag id's and set current alliance
+    public void updateAlliance(int tagID){
+        if (tagID == 24) {
+            currentAlliance = alliance.blue;
+        } else if (tagID == 20) {
+            currentAlliance = alliance.red;
+        }
     }
 
-    // test color
-    public float getHue(){
-        ColorSensor colorTest = config.colorRight; // change this to test different shooters
-        int r = colorTest.red();
-        int g = colorTest.green();
-        int b = colorTest.blue();
-        float[] hsvValues = {0F, 0F, 0F}; // idk why we're making a float list. apparently it makes the color sensor more accurate somehow
-        Color.RGBToHSV(r, g, b, hsvValues);
-        float hue = hsvValues[0];
-        int[] list = {r, g, b};
-        // return Arrays.toString(list);
-        return hue;
+    public alliance getCurrentAlliance(){
+        return currentAlliance;
     }
-     */
 
-    // update the april tag id
+    // get april tag id and set the current pattern
     public void updatePattern(int tagID){
         if (tagID == 21) {
             currentPattern = new ballColor[]{ballColor.green, ballColor.purple, ballColor.purple};
@@ -191,19 +194,64 @@ public class Methods {
         }
     }
 
+    // determine if a shooter has a ball and what color it is (call it every single loop somewhere)
+    public ballColor getBallColor(ColorSensor colorSensor, DistanceSensor rangeSensor){
+        // set up distance and color variables
+        sensedDist = rangeSensor.getDistance(DistanceUnit.CM);
+        int r = colorSensor.red();
+        int g = colorSensor.green();
+        int b = colorSensor.blue();
+        float[] hsvValues = {0F, 0F, 0F}; // idk why we're making a float list. apparently it makes the color sensor more accurate somehow
+        Color.RGBToHSV(r, g, b, hsvValues);
+        float hue = hsvValues[0];
+
+        if (sensedDist > 4.9) { // yes, really, this is the exact sweet spot.
+            currentColor = ballColor.empty;
+        } else {
+            if (hue >= 110 && hue <= 156) {
+                currentColor = ballColor.green;
+            } else if (hue >= 156 && hue <= 250) {
+                currentColor = ballColor.purple;
+            } else {
+                currentColor = ballColor.unknown;
+            }
+        }
+
+        return currentColor;
+    }
+
+    // sensor tests to check sensors and determine values
+    // test distance
+    public double getRange(DistanceSensor rangeTestSensor) {
+        return rangeTestSensor.getDistance(DistanceUnit.CM);
+    }
+
+    // test color
+    public float getHue(ColorSensor colorTestSensor){
+        int r = colorTestSensor.red();
+        int g = colorTestSensor.green();
+        int b = colorTestSensor.blue();
+        float[] hsvValues = {0F, 0F, 0F}; // idk why we're making a float list. apparently it makes the color sensor more accurate somehow
+        Color.RGBToHSV(r, g, b, hsvValues);
+        float hue = hsvValues[0];
+        int[] list = {r, g, b};
+        // return Arrays.toString(list);
+        return hue;
+    }
+
     // check if ANY shooter matches the pattern
     public boolean anyShooterMatches() {
-        return currentPattern[0] == getBallColor("left") || currentPattern[0] == getBallColor("mid")  || currentPattern[0] == getBallColor("right");
+        return currentPattern[0] == getBallColor(config.colorLeft, config.rangeLeft) || currentPattern[0] == getBallColor(config.colorMid, config.rangeMid)  || currentPattern[0] == getBallColor(config.colorRight, config.rangeRight);
     }
 
     // return true to shoot if the specific shooter should shoot
-    public boolean shouldShoot(String whichShooter){
+    public boolean shouldShoot(ColorSensor colorSensor, DistanceSensor rangeSensor){
 
-        if (getBallColor(whichShooter) == currentPattern[0]){
+        if (getBallColor(colorSensor, rangeSensor) == currentPattern[0]){
             return true; // if the ball matches the pattern, shoot
-        } else if ((currentPattern[0] == ballColor.unknown) && (getBallColor(whichShooter) != ballColor.empty)) {
+        } else if ((currentPattern[0] == ballColor.unknown) && (getBallColor(colorSensor, rangeSensor) != ballColor.empty)) {
             return true; // if no april tag is recognized just shoot one
-        } else if (getBallColor(whichShooter) != ballColor.empty && !anyShooterMatches()) {
+        } else if (getBallColor(colorSensor, rangeSensor) != ballColor.empty && !anyShooterMatches()) {
             return true; // just dump if the shooter has a ball and nothing matches the pattern
         } else {
             return false;
@@ -247,16 +295,12 @@ public class Methods {
         double derivative = (error - lastError) / timeDifference; // or this
 
         double feedForward = FFOffset + (F * targetRPM); // Use feedforward coefficient and target to get motor power
-        double output = feedForward + (kP * error) + (kI * integral) + (kD * derivative); // and this is just magic.
+        double output = feedForward + (kP * error) + Math.max(0, Math.min((kI * integral), 0.075)) + (kD * derivative); // clamp I so it doesn't run away
         output = Math.max(0.01, Math.min(output, 1)); // make sure output is power between 0.01 and 1 (not 0 (zeroPower = motorBrake -> slight twitch))
 
         shooterPower(output); // set motor powers! (use output for pid, power for direct power)
         // shooterPower(1); // test powers
 
-        // reset integral when target changes (or goes below 500 (stopping))
-        if ((targetRPM != lastTarget) || (lastRPM < 500)) {
-            integral = 0;
-        }
         lastTarget = targetRPM;
         lastRPM = getShooterSpeed();
 
@@ -265,7 +309,7 @@ public class Methods {
         lastTime = currentTime;
 
         // CHECK IF SHOOTER IS READY TO FIRE
-        double readyTolerance = 150; // CHANGE THIS FOR MORE ACCURACY (how far from target RPM should the shooter be in order to shoot)
+        double readyTolerance = 150; // Tolerance should only really be 5% of the target
         double checkTime = .15; // shooter must be at target RPM for this long before launching
 
         // while the shooter is super close to its target speed, run a timer.
@@ -287,10 +331,10 @@ public class Methods {
         telemetry.addData("TargetRPM", targetRPM);
         telemetry.addData("Current RPM", currentRPM);
         telemetry.addData("Error", error);
-        telemetry.addData("avg. error", avgError);
-        telemetry.addData("Pterm", kP * error);
-        telemetry.addData("Iterm", kI * integral);
-        telemetry.addData("Dterm", kD * derivative);
+        //telemetry.addData("avg. error", avgError);
+        //telemetry.addData("Pterm", kP * error);
+        //telemetry.addData("Iterm", kI * integral);
+        //telemetry.addData("Dterm", kD * derivative);
         telemetry.addData("Power", output);
         telemetry.addData("Ready to Shoot", ready);
 
@@ -306,7 +350,7 @@ public class Methods {
     }
 
     // ANGLE CONTROL
-    // convert angle to servo position
+    // convert angle to servo position (clamp to 75 max and 45 min)
     public double angleToPos(double angle) {
         double clampedAngle;
             if (angle >= 75){
@@ -316,17 +360,101 @@ public class Methods {
             } else {
                 clampedAngle = angle;
             }
-        double pos = 0.04467 * Math.pow((clampedAngle - 45), 0.7818); // magic numbers. don't ask just trust
+        double pos = (0.00000071943 * Math.pow(clampedAngle, 4)) - (0.000129484 * Math.pow(clampedAngle, 3)) + (0.00775377 * Math.pow(clampedAngle, 2)) - (0.146158 * clampedAngle) - 0.264893; // magic numbers. don't ask just trust
         return Math.max(0, Math.min(pos, .7));
     }
 
-    // set angle?? LIMELIGHT? nah
-
-    // Update angle every loop in the runner ***SYNC THEIR SPEEDS (one is faster for some reason (only in one direction))
+    // Update angle every loop in the runner THIS CALLS angleToPos!!! just send a raw angle to this method
     public void updateAngle(double targetAngle) {
         // set both to same speed
         config.angleLeft.setPosition(angleToPos(targetAngle)); // update angle servos
         config.angleRight.setPosition(angleToPos(targetAngle));
+    }
+
+    // AUTO FIRE ALIGNMENT
+    // find values for what the limelight sees
+    public void getLLDistances(Telemetry telemetry){
+        config.limelight.pipelineSwitch(2); // pipeline 2 for fire alignment: only April tags !!! and !!!
+        LLResult result = config.limelight.getLatestResult();
+        if (result != null && result.isValid()) {
+            currentDepotTag = result.getFiducialResults().get(0).getFiducialId();
+            //telemetry.addData("current depot tag ID", currentDepotTag);
+            currentTagArea = result.getTa();
+            telemetry.addData("April tag area", currentTagArea);
+            currentX = result.getTx();
+            //telemetry.addData("target x", currentX);
+            currentXAngle = result.getFiducialResults().get(0).getTargetPoseCameraSpace().getOrientation().getYaw();
+            //telemetry.addData("X angle", currentXAngle);
+            currentY = result.getTy();
+            //telemetry.addData("target y", currentY);
+        } else {
+            telemetry.addData("Limelight", "No targets seen");
+        }
+    }
+
+    // get best rpm based on april tag size
+    public int alignRPM(boolean shootingThree, Telemetry telemetry){
+        config.limelight.pipelineSwitch(2); // pipeline 2 for fire alignment: only April tags 20 and 24
+        LLResult result = config.limelight.getLatestResult();
+        if (result != null && result.isValid()) {
+            double finalRPM;
+            if (shootingThree) {
+                finalRPM = 1.15 * 2483.30599 * Math.pow(currentTagArea, -0.175816); // higher rpm for 3 at once
+            } else {
+                finalRPM = 2483.30599 * Math.pow(currentTagArea, -0.175816); // fancy power regression to find ideal rpm
+            }
+            return (int) finalRPM;
+        } else {
+            return 2500; // if limelight can't see the april tag for some reason default to our most used shot
+        }
+    }
+
+    // replace the left stick input with a P controller to keep the april tag centered
+    public double autoLeftStickAlign(double manualInput, Telemetry telemetry){
+        config.limelight.pipelineSwitch(2); // pipeline 2 for fire alignment: only April tags 20 and 24
+        LLResult result = config.limelight.getLatestResult();
+        if (result != null && result.isValid()) {
+            // adjust target based on the angle of the april tag relative to the robot
+            finalTargetX = targetX + (-0.001 * Math.pow(currentXAngle, 3) + (.32 * currentXAngle)); // adjust the target based on the angle. trust the magic.
+            double errorX = currentX - finalTargetX;
+            double adjustmentX; // add a fraction of the error every loop until there is no error. super simple. super smart.
+            if (Math.abs(errorX) < 5){
+                adjustmentX = Px * errorX * 2; // add more power when we get close to the target
+            } else {
+                adjustmentX = Px * errorX;
+            }
+            adjustmentX = Math.max(-maxSpeedX, Math.min(adjustmentX, maxSpeedX)); // Limit the maximum adjustment speed so it doesn't jerk too fast
+
+            telemetry.addData("current left stick adjustment", adjustmentX);
+            telemetry.addData("current X offset error", errorX);
+            return adjustmentX;
+        } else {
+            return manualInput; // if limelight doesn't actually see anything return to manual control
+        }
+    }
+
+    // align the shooter angle with the april tag - THIS IS A BASIC P CONTROLLER - only proportional
+    public double alignShooterAngle(double angle, boolean shootingThree, Telemetry telemetry){
+        config.limelight.pipelineSwitch(2); // pipeline 2 for fire alignment: only April tags 20 and 24
+        LLResult result = config.limelight.getLatestResult();
+        if (result != null && result.isValid()) {
+            if (shootingThree) {
+                targetY = -9.75; // higher angle for 3 at once
+            } else {
+                targetY = -9.5;
+            }
+            double errorY = currentY - targetY;
+            double adjustmentY = Py * errorY; // add a fraction of the error every loop until there is no error. super simple. super smart.
+            adjustmentY = Math.max(-maxSpeedY, Math.min(adjustmentY, maxSpeedY)); // Limit the maximum adjustment speed so it doesn't jerk too fast
+            angle += adjustmentY;
+
+            telemetry.addData("current angle", angle);
+            telemetry.addData("current Y offset error", errorY);
+            //telemetry.addData("adjustment", adjustment);
+            return Math.max(45, Math.min(angle, 75));
+        } else {
+            return angle; // if limelight doesn't actually see anything set to the last angle
+        }
     }
 
     // LAUNCH SERVO CONTROL
