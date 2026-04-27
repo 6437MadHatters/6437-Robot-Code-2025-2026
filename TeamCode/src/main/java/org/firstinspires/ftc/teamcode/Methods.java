@@ -116,7 +116,7 @@ public class Methods {
     double out = .14;
     double hold = .26;
     double drop = .43;
-    int scoopAngle = 55; // how high scoop method goes up; it was 45 :)
+    int scoopAngle = 60; // how high scoop method goes up; it was 45 :)
     double servoWait = .5;
 
     // ACTUAL METHODS
@@ -148,7 +148,7 @@ public class Methods {
 
     // PATTERN IDENTIFICATION
     // read the april tag ID for randomization
-    public void readTagIDs(Telemetry telemetry){
+    public void readTagIDs(Telemetry telemetry, boolean isThisABackAuto){
         LLResult result = config.limelight.getLatestResult();
         if (result != null && result.isValid()){
                 for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
@@ -164,16 +164,24 @@ public class Methods {
         } else {
             telemetry.addData("Limelight", "No targets seen");
         }
-        updateAlliance(allianceID);
+        updateAlliance(allianceID, isThisABackAuto);
         updatePattern(patternID);
     }
 
     // get april tag id's and set current alliance
-    public void updateAlliance(int tagID){
+    public void updateAlliance(int tagID, boolean isThisABackAuto){
         if (tagID == 24) {
-            currentAlliance = alliance.blue;
+            if (!isThisABackAuto) {
+                currentAlliance = alliance.blue;
+            } else {
+                currentAlliance = alliance.red;
+            }
         } else if (tagID == 20) {
-            currentAlliance = alliance.red;
+            if (!isThisABackAuto) {
+                currentAlliance = alliance.red;
+            } else {
+                currentAlliance = alliance.blue;
+            }
         }
     }
 

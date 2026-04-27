@@ -15,18 +15,18 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 // @Disabled // comment this line to show this program on drivers hub
-@Autonomous(name = "Pattern Auto", group = "autonomous")
-public class patternAuto extends LinearOpMode {
+@Autonomous(name = "Front 3 Cycle", group = "autonomous")
+public class front3Cycle extends LinearOpMode {
 
     // class variables. especially config. And RR.
     Configuration config;
-    MecanumDrive drive; //object for roadrunner manipulation
+    MecanumDrive drive; // object for roadrunner manipulation
     Methods method;
     BotState state;
     RRPoses poses;
 
-    int shootRPM = 2125;
-    int shootAngle = 72;
+    int shootRPM = 2300;
+    int shootAngle = 75;
 
     @Override
     public void runOpMode() {
@@ -49,7 +49,7 @@ public class patternAuto extends LinearOpMode {
         // Get results from the Limelight - short init loop
         while (opModeInInit()) {
             telemetry.addLine("Init done. Finding April Tag.");
-            method.readTagIDs(telemetry);
+            method.readTagIDs(telemetry, false); // THIS IS NOT A BACK AUTO -> THIS MUST BE FALSE
             telemetry.addData("Colors (left, mid, right)", method.getBallColor(config.colorLeft, config.rangeLeft) + ", " + method.getBallColor(config.colorMid, config.rangeMid) + ", " + method.getBallColor(config.colorRight, config.rangeRight));
             //telemetry.addData("Ranges (left, mid, right)", method.getRange(config.rangeLeft) + ", " + method.getRange(config.rangeMid) + ", " + method.getRange(config.rangeRight));
             //telemetry.addData("Hues (left, mid, right)", method.getHue(config.colorLeft) + ", " + method.getHue(config.colorMid) + ", " + method.getHue(config.colorRight));
@@ -57,37 +57,38 @@ public class patternAuto extends LinearOpMode {
         }
 
         // initialize and assign more variables to the other classes with the proper arguments. these need to know what the alliance tag is.
-        poses = new RRPoses(telemetry, method.getCurrentAlliance()); // build with correct alliance
+        poses = new RRPoses(telemetry, method.getCurrentAlliance(), false); // build with correct alliance IS THIS A BACK AUTO? NO! FALSE!
         drive = new MecanumDrive(hardwareMap, poses.startFrontPose()); // initialize RR drive with start position (it changes after we scan)
 
         // TRAJECTORY ACTIONS !!! these are the paths the robot actually follows***
         TrajectoryActionBuilder toShootOne = drive.actionBuilder(poses.startFrontPose())
                 .setTangent(poses.startFrontTan())
-                .splineToSplineHeading(poses.shootPose(), poses.shootTanOut(), new AngularVelConstraint(Math.PI/2)); // move from start to shoot position (tangent is weird)
+                .splineToSplineHeading(poses.shootFrontPose(), poses.shootFrontTanOut(), new AngularVelConstraint(Math.PI/2)); // move from start to shoot position (tangent is weird)
 
-        TrajectoryActionBuilder toIntakeOne = drive.actionBuilder(poses.shootPose())
-                .setTangent(poses.shootTanOut())
+        TrajectoryActionBuilder toIntakeOne = drive.actionBuilder(poses.shootFrontPose())
+                .setTangent(poses.shootFrontTanOut())
                 .splineToSplineHeading(poses.startIntakeOnePose(), -poses.startIntakeOneTan()) // move to prepare for intake
-                .strafeToConstantHeading(poses.endIntakeOne(), new TranslationalVelConstraint(17)); // intake!
+                .strafeToConstantHeading(poses.endIntakeOneEmpty(), new TranslationalVelConstraint(17)); // intake! (and empty)
 
-        TrajectoryActionBuilder toShootTwo = drive.actionBuilder(poses.endIntakeOnePose())
+        TrajectoryActionBuilder toShootTwo = drive.actionBuilder(poses.endIntakeOneEmptyPose()) // empty pose
                 .setTangent(poses.endIntakeOneTan())
-                .splineToSplineHeading(poses.shootPose(), poses.shootTanIn()); // go to shoot again
+                .splineToSplineHeading(poses.shootFrontPose(), poses.shootFrontTanIn()); // go to shoot again
 
-        TrajectoryActionBuilder toIntakeTwo = drive.actionBuilder(poses.shootPose())
-                .setTangent(poses.shootTanOut())
+        TrajectoryActionBuilder toIntakeTwo = drive.actionBuilder(poses.shootFrontPose())
+                .setTangent(poses.shootFrontTanOut())
                 .splineToSplineHeading(poses.startIntakeTwoPose(), -poses.startIntakeTwoTan()) // move to prepare for intake again
                 .strafeToConstantHeading(poses.endIntakeTwo(), new TranslationalVelConstraint(17)); // intake again!
 
-        TrajectoryActionBuilder toShootThree = drive.actionBuilder(poses.endIntakeTwoPose())
+        TrajectoryActionBuilder toEmpty = drive.actionBuilder(poses.endIntakeTwoPose())
                 .setTangent(poses.endIntakeTwoTan())
-                .splineToSplineHeading(poses.shootPose(), poses.shootTanIn()); // go to shoot again again!
+                .splineToSplineHeading(poses.emptyPose(), poses.emptyTan()); // go to shoot again again!
 
-        TrajectoryActionBuilder toEndMove = drive.actionBuilder(poses.shootPose())
+        TrajectoryActionBuilder toShootThree = drive.actionBuilder(poses.emptyPose())
+                .setTangent(-poses.emptyTan())
+                .splineToSplineHeading(poses.shootFrontPose(), poses.shootFrontTanIn(), new TranslationalVelConstraint(20)); // go to shoot again again! slow down for some reason
+
+        TrajectoryActionBuilder toEndMove = drive.actionBuilder(poses.shootFrontPose())
                 .strafeToConstantHeading(poses.endMoveFront()); // get off line to get move points
-
-        poses.check(telemetry);
-        telemetry.update();
 
         // run until the auto ends or time runs out (or driver presses STOP)
         waitForStart();
@@ -105,35 +106,34 @@ public class patternAuto extends LinearOpMode {
             Actions.runBlocking(
                     new ParallelAction(
                             new SequentialAction(
-                                    state.setBotAction(botState.shoot, false, false, false, shootRPM, shootAngle), // spin up when bot starts
+                                    state.setBotAction(botState.shoot, false, false, false, shootRPM, shootAngle), // start flywheel while bot is moving
                                     toShootOne.build(),
-                                    state.setBotAction(botState.shoot, true, false,false, shootRPM, shootAngle), // shoot three times
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.intake, false, false, false, 0, 0),
+                                    state.setBotAction(botState.shoot, false, true,false, shootRPM, shootAngle), // shoot three balls
+                                    state.setBotAction(botState.intake, false, false, false, 0, 0), // stop flywheel, start intake
                                     toIntakeOne.build(),
                                     new ParallelAction( // scoop once and start spinning up on the way to shoot
                                             new SequentialAction(
-                                                    state.setBotAction(botState.intake, false, false, true, 0, 0),
-                                                    new SleepAction(.2), // wait for a stuck ball to come up
-                                                    state.setBotAction(botState.shoot, false, false, false, shootRPM, shootAngle)),
-                                            toShootTwo.build()),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.intake, false, false, false, 0, 0),
+                                                    state.setBotAction(botState.intake, false, false, true, 0, 0), // scoop once
+                                                    new SleepAction(.25), // wait for a stuck ball to come up
+                                                    state.setBotAction(botState.shoot, false, false, false, shootRPM, shootAngle)), // start flywheel while bot is moving
+                                            new SequentialAction(
+                                                    new SleepAction(.25), // wait for the rail to empty before moving (sequential action so the flywheel doesn't block
+                                                    toShootTwo.build())),
+                                    state.setBotAction(botState.shoot, false, true, false, shootRPM, shootAngle), // shoot three balls
+                                    state.setBotAction(botState.intake, false, false, false, 0, 0), // stop flywheel, start intake
                                     toIntakeTwo.build(),
                                     new ParallelAction( // scoop once and start spinning up on the way to shoot
                                             new SequentialAction(
-                                                    state.setBotAction(botState.intake, false, false, true, 0, 0),
-                                                    new SleepAction(.2), // wait for a stuck ball to come up
-                                                    state.setBotAction(botState.shoot, false, false, false, 2100, shootAngle)),
-                                            toShootThree.build()),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
-                                    state.setBotAction(botState.shoot, true, false, false, shootRPM, shootAngle),
+                                                    state.setBotAction(botState.intake, false, false, true, 0, 0), // scoop once
+                                                    new SleepAction(.25), // wait for a stuck ball to come up
+                                                    state.setBotAction(botState.shoot, false, false, false, shootRPM, shootAngle)), // start flywheel while bot is moving
+                                            new SequentialAction(
+                                                    toEmpty.build(),
+                                                    new SleepAction(.25),
+                                                    toShootThree.build())),
+                                    state.setBotAction(botState.shoot, false, true, false, shootRPM, shootAngle), // shoot three balls
 
-                                    state.setBotAction(botState.idle, false, false, false, 0, 0),
+                                    state.setBotAction(botState.idle, false, false, false, 0, 0), // stop flywheel, move out the way
                                     toEndMove.build()
                             ),
                             state.updateStateAction()
